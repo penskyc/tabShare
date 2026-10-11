@@ -1067,9 +1067,9 @@ function TexDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (name
 
 export type { Peer };
 
-/** True on phones and portrait tablets (same breakpoint as the CSS drawer layout). */
+/** True on phones (any orientation) and portrait tablets (same breakpoint as the CSS drawer layout). */
 function useNarrow() {
-  const query = '(max-width: 860px)';
+  const query = '(max-width: 860px), (max-height: 500px)';
   const [narrow, setNarrow] = useState(() => matchMedia(query).matches);
   useEffect(() => {
     const mq = matchMedia(query);

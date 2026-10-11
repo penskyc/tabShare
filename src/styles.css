@@ -202,7 +202,7 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 .modal h3 { margin: 0; }
 .center-card { max-width: 380px; margin: 20vh auto; text-align: center; display: grid; gap: 10px; }
 
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 500px) {
   .lobby { grid-template-columns: minmax(0, 1fr); }
   .lobby-hero { overflow-wrap: anywhere; }
   .lobby-hero { padding: 40px 16px 10px; }
@@ -274,7 +274,7 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 .call-settings label.check { display: flex; gap: 8px; align-items: flex-start; color: var(--text); }
 .call-settings select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 8px; color: var(--text); width: 100%; }
 .call-error { color: #ffb3bf; font-size: 12px; cursor: pointer; }
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 500px) {
   .tile { width: 120px; }
   .call-btn span { display: none; }
 }
@@ -293,9 +293,9 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 .side-rail button { width: 34px; height: 34px; border-radius: 8px; background: none; border: 0; color: var(--muted); font-size: 16px; }
 .side-rail button:hover { background: var(--panel); color: var(--text); }
 
-/* ---------- phones / portrait tablets: side panel as a drawer, one-row transport ---------- */
+/* ---------- phones (incl. landscape, by height) / portrait tablets: side panel as a drawer, one-row transport ---------- */
 .menu-btn { display: none; }
-@media (max-width: 860px) {
+@media (max-width: 860px), (max-height: 500px) {
   .room { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; grid-template-areas: 'head' 'stage' 'foot'; }
   .room-head { gap: 8px; padding: 6px 10px; min-height: 52px; }
   .menu-btn { display: inline-flex; padding: 6px 12px; font-size: 18px; }
