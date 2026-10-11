@@ -33,7 +33,7 @@ npm test                                    # convolver + offline NAM chain (nee
 node smoke.mjs [dist/win-unpacked/tabShare.exe]        # end to end vs local dev; monitor muted, nothing is audible
 npm run build:native                        # VST addon (+ plugin host on macOS); Windows: VS 2022 C++ tools + cmake (`pip install --user cmake`), macOS: Xcode CLT + `brew install cmake`
 npm run dist                                # Windows: dist/tabShare-Windows-x64-Setup.exe (build:native first, or the app ships without VST) (stop `npm run dev` first or Vite can lock dist/)
-npm run dist:mac                            # macOS: dist/tabShare-macOS-{arm64,x64}.dmg (native addon + plugin host are universal), Developer ID signed + notarized (keychain profile `tabshare`)
+npm run dist:mac                            # macOS: dist/tabShare-Mac.dmg, one universal app (Apple Silicon + Intel); the updater uses tabShare-<version>-Mac.zip, Developer ID signed + notarized (keychain profile `tabshare`)
                                             # unsigned test build: npx electron-builder --mac -c.mac.identity=- -c.mac.hardenedRuntime=false
                                             # (ad-hoc + hardened runtime can't launch: no Team ID, so library validation rejects Electron's own framework)
                                             # node smoke.mjs dist/mac-arm64/tabShare.app/Contents/MacOS/tabShare

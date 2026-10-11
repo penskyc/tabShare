@@ -31,7 +31,9 @@
       "native/build/Release/tabshare_vst.node",
       "native/build/Release/tabshare_plugin_host",
       "connect.html",
-      "connect-preload.cjs"
+      "connect-preload.cjs",
+      "!node_modules/audify/vendor/**",
+      "!node_modules/audify/src/**"
     ],
     "publish": [
       {
@@ -54,19 +56,17 @@
         {
           "target": "dmg",
           "arch": [
-            "arm64",
-            "x64"
+            "universal"
           ]
         },
         {
           "target": "zip",
           "arch": [
-            "arm64",
-            "x64"
+            "universal"
           ]
         }
       ],
-      "artifactName": "tabShare-${version}-macOS-${arch}.${ext}",
+      "artifactName": "tabShare-${version}-Mac.${ext}",
       "category": "public.app-category.music",
       "hardenedRuntime": true,
       "extendInfo": {
@@ -75,10 +75,11 @@
       },
       "entitlements": "resources/entitlements.mac.plist",
       "entitlementsInherit": "resources/entitlements.mac.plist",
-      "sign": "resources/sign.cjs"
+      "sign": "resources/sign.cjs",
+      "x64ArchFiles": "Contents/Resources/app.asar.unpacked/native/build/Release/*"
     },
     "dmg": {
-      "artifactName": "tabShare-macOS-${arch}.${ext}"
+      "artifactName": "tabShare-Mac.${ext}"
     },
     "asarUnpack": [
       "native/build/Release/*"

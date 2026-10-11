@@ -69,11 +69,7 @@ export const NATIVE_DRIVER = native?.platform === 'darwin' ? 'Core Audio' : 'ASI
 export const RELEASES = 'https://github.com/penskyc/tabShare/releases/latest';
 export const DESKTOP_DOWNLOADS = {
   win: [{ url: `${RELEASES}/download/tabShare-Windows-x64-Setup.exe`, label: 'get the Windows app (x64)' }],
-  // Both Mac builds: browsers report "Intel" in the user agent on every Mac, so the page can't tell which one fits.
-  mac: [
-    { url: `${RELEASES}/download/tabShare-macOS-arm64.dmg`, label: 'get the Mac app (Apple Silicon)' },
-    { url: `${RELEASES}/download/tabShare-macOS-x64.dmg`, label: 'Intel' },
-  ],
+  mac: [{ url: `${RELEASES}/download/tabShare-Mac.dmg`, label: 'get the Mac app' }], // universal: Apple Silicon + Intel
 } as const;
 export type DesktopOs = keyof typeof DESKTOP_DOWNLOADS;
 

@@ -100,8 +100,7 @@ Download the latest build from [Releases](https://github.com/penskyc/tabShare/re
 | Platform | File |
 |---|---|
 | Windows 10/11, 64-bit (x64; also runs on Windows on ARM via emulation) | [`tabShare-Windows-x64-Setup.exe`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-Windows-x64-Setup.exe) |
-| macOS 12+, Apple Silicon (M1 and later; arm64) | [`tabShare-macOS-arm64.dmg`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-macOS-arm64.dmg) |
-| macOS 12+, Intel (x64) | [`tabShare-macOS-x64.dmg`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-macOS-x64.dmg) |
+| macOS 12+, Apple Silicon and Intel (one universal app) | [`tabShare-Mac.dmg`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-Mac.dmg) |
 
 On first launch it asks for:
 
