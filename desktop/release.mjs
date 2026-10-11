@@ -9,10 +9,13 @@ const { version, build } = JSON.parse(readFileSync(new URL('./package.json', imp
 const { owner, repo } = build.publish[0];
 const tag = `v${version}`;
 const mac = process.platform === 'darwin';
+// Named by OS + architecture (no version), so .../releases/latest/download/<name> links never change.
+const WIN_EXE = 'tabShare-Windows-x64-Setup.exe';
+const MAC_DMG = 'tabShare-macOS-arm64.dmg';
 const feed = mac ? 'latest-mac.yml' : 'latest.yml';
 const files = mac
-  ? ['tabShare.dmg', `tabShare-${version}-mac.zip`, `tabShare-${version}-mac.zip.blockmap`, feed]
-  : ['tabShare-Setup.exe', 'tabShare-Setup.exe.blockmap', feed];
+  ? [`${MAC_DMG}`, `tabShare-${version}-macOS-arm64.zip`, `tabShare-${version}-macOS-arm64.zip.blockmap`, feed]
+  : [WIN_EXE, `${WIN_EXE}.blockmap`, feed];
 
 for (const f of files) if (!existsSync(`dist/${f}`)) throw new Error(`missing dist/${f}: build first`);
 // The updater refuses a download whose sha512 doesn't match the feed, so check before anything goes public.

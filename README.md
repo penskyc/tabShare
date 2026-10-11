@@ -95,8 +95,14 @@ Create a **publishable** key (`t3k_pub_…`) at [TONE3000](https://www.tone3000.
 
 ## Desktop app
 
-Download the latest **Windows** (`tabShare-Setup.exe`) or **macOS** (`tabShare.dmg`, Apple Silicon) build from
-[Releases](https://github.com/penskyc/tabShare/releases/latest). On first launch it asks for:
+Download the latest build from [Releases](https://github.com/penskyc/tabShare/releases/latest):
+
+| Platform | File |
+|---|---|
+| Windows 10/11, 64-bit (x64; also runs on Windows on ARM via emulation) | [`tabShare-Windows-x64-Setup.exe`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-Windows-x64-Setup.exe) |
+| macOS 12+, Apple Silicon (M1 and later; arm64) | [`tabShare-macOS-arm64.dmg`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-macOS-arm64.dmg) |
+
+Intel Macs aren't built yet. On first launch it asks for:
 
 - the **server URL**,
 - an **API key** from the server's admin (Admin → API keys),

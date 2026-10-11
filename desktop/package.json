@@ -19,7 +19,7 @@
   "build": {
     "appId": "dev.coreypensky.tabshare",
     "productName": "tabShare",
-    "artifactName": "tabShare-Setup.${ext}",
+    "artifactName": "tabShare-${os}-${arch}.${ext}",
     "files": [
       "main.js",
       "preload.cjs",
@@ -43,7 +43,7 @@
     ],
     "win": {
       "target": "nsis",
-      "artifactName": "tabShare-Setup.${ext}"
+      "artifactName": "tabShare-Windows-${arch}-Setup.${ext}"
     },
     "nsis": {
       "oneClick": true,
@@ -64,7 +64,7 @@
           ]
         }
       ],
-      "artifactName": "tabShare-${version}-mac.${ext}",
+      "artifactName": "tabShare-${version}-macOS-${arch}.${ext}",
       "category": "public.app-category.music",
       "hardenedRuntime": true,
       "extendInfo": {
@@ -76,7 +76,7 @@
       "sign": "resources/sign.cjs"
     },
     "dmg": {
-      "artifactName": "tabShare.dmg"
+      "artifactName": "tabShare-macOS-${arch}.${ext}"
     },
     "asarUnpack": [
       "native/build/Release/*"

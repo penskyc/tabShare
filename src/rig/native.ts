@@ -68,9 +68,9 @@ export const NATIVE_DRIVER = native?.platform === 'darwin' ? 'Core Audio' : 'ASI
 /** Desktop installers are GitHub release assets (the same releases the apps update from). */
 export const RELEASES = 'https://github.com/penskyc/tabShare/releases/latest';
 export const DESKTOP_DOWNLOADS = {
-  win: { url: `${RELEASES}/download/tabShare-Setup.exe`, label: 'get the Windows app' },
+  win: { url: `${RELEASES}/download/tabShare-Windows-x64-Setup.exe`, label: 'get the Windows app (x64)' },
   // shortcut: Apple Silicon build only (Safari/Chrome report Intel in the user agent on every Mac); add x64 if someone needs it.
-  mac: { url: `${RELEASES}/download/tabShare.dmg`, label: 'get the Mac app (Apple Silicon)' },
+  mac: { url: `${RELEASES}/download/tabShare-macOS-arm64.dmg`, label: 'get the Mac app (Apple Silicon)' },
 } as const;
 export type DesktopOs = keyof typeof DESKTOP_DOWNLOADS;
 
