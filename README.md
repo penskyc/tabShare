@@ -126,6 +126,7 @@ npm run build
 ```
 
 Desktop app: see [`desktop/README.md`](desktop/README.md) (Electron; the VST3 host needs CMake and a C++ toolchain).
+iPhone/iPad app: see [`mobile/README.md`](mobile/README.md) (Expo, local Xcode builds, TestFlight).
 Project notes for contributors and AI assistants are in [`CLAUDE.md`](CLAUDE.md).
 
 ## Credits

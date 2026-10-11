@@ -1,0 +1,35 @@
+{
+  "expo": {
+    "name": "tabShare",
+    "slug": "tabshare",
+    "version": "0.1.0",
+    "orientation": "default",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "dev.coreypensky.tabshare",
+      "appleTeamId": "7HBNH5BQ6T",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSMicrophoneUsageDescription": "tabShare uses your audio interface for the amp rig, and your microphone for calls.",
+        "NSCameraUsageDescription": "tabShare uses your camera for video calls.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIRequiresFullScreen": false
+      }
+    },
+    "plugins": [
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "17.0"
+          }
+        }
+      ],
+      "./plugins/withSettingsBundle",
+      "./plugins/withSceneLifecycle"
+    ],
+    "backgroundColor": "#0e0e13"
+  }
+}

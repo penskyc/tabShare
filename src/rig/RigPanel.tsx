@@ -168,6 +168,21 @@ export function RigPanel({ rig, inCall }: { rig: RigControls; inCall: boolean })
               ))}
             </select>
           </label>
+          {rig.voiceSupported && (
+            <label className="grow" title="iOS uses one input device: while the rig is on, your voice in the call comes from the interface">
+              Voice (call)
+              <select value={rig.voiceChannel} onChange={(e) => rig.selectVoiceChannel(e.target.value)}>
+                <option value="">None (silent while playing)</option>
+                {Array.from({ length: rig.channelCount }, (_, i) => String(i + 1))
+                  .filter((c) => c !== rig.channel)
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      Input {c}
+                    </option>
+                  ))}
+              </select>
+            </label>
+          )}
           <div className="rig-meter" title="Input level — aim for peaks in the green">
             <i style={{ width: `${meterPct}%` }} className={rig.level > 0.9 ? 'clip' : ''} />
           </div>

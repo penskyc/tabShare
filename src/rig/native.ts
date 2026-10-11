@@ -10,7 +10,7 @@ export type NativeToEngine =
   | { type: 'devices' }
   | { type: 'start'; device: string; outChannel: number; bufferSize: number }
   | { type: 'stop' }
-  | { type: 'params'; params: { channel: number; inGain: number; outGain: number; monitor: boolean; bypass: boolean } }
+  | { type: 'params'; params: { channel: number; inGain: number; outGain: number; monitor: boolean; bypass: boolean; voiceChannel?: number } }
   | { type: 'loadModel'; json: string }
   | { type: 'unloadModel' }
   | { type: 'ir'; samples: Float32Array | null }
@@ -42,6 +42,8 @@ export type NativeFromEngine =
   | { type: 'modelLoaded'; ok: boolean }
   | { type: 'level'; peak: number }
   | { type: 'pcm'; samples: Float32Array }
+  /** iOS app: the interface input picked for your voice (iOS uses one input device at a time). */
+  | { type: 'voice'; samples: Float32Array }
   | { type: 'vstList'; available: boolean; plugins: { name: string; path: string }[] }
   | { type: 'vstLoaded'; slot: number; name: string; latency: number }
   | { type: 'vstError'; slot: number; message: string }

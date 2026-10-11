@@ -41,7 +41,7 @@ export const callSupported = () => window.isSecureContext && !!navigator.mediaDe
  * no glare; each connection has exactly one audio + one video transceiver, and every media change
  * (mute, camera, device switch, screen share) is a replaceTrack — no renegotiation.
  */
-export function useCall(room: RoomConnection, instrumentStream: MediaStream | null = null) {
+export function useCall(room: RoomConnection, instrumentStream: MediaStream | null = null, voiceStream: MediaStream | null = null) {
   const [inCall, setInCall] = useState(false);
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
@@ -71,6 +71,11 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
   };
   const instrumentRef = useRef(instrumentStream);
   instrumentRef.current = instrumentStream;
+  // iOS app with the rig on: the voice comes from the interface via the rig (iOS has one input device), so it stands in
+  // for the mic, and WebKit's own mic capture is released so it doesn't fight the native engine for the hardware.
+  const voiceRef = useRef(voiceStream);
+  voiceRef.current = voiceStream;
+  const rigVoiceTrack = () => voiceRef.current?.getAudioTracks()[0]?.clone() ?? null;
   const connectInstrument = (stream: MediaStream | null) => {
     const m = mixer.current;
     if (!m) return;
@@ -252,19 +257,22 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       return;
     }
     try {
+      const rigVoice = rigVoiceTrack();
+      const audio = rigVoice ? false : audioConstraints(micId, originalSound);
+      const fallbackAudio = rigVoice ? false : audioConstraints('', originalSound);
       const stream = await navigator.mediaDevices.getUserMedia({
-        audio: audioConstraints(micId, originalSound),
+        audio,
         video: videoConstraints(camId),
       }).catch((e) => {
         // Saved device unplugged, or no camera: fall back to defaults / audio only.
         if (e.name === 'OverconstrainedError' || e.name === 'NotFoundError') {
-          return navigator.mediaDevices.getUserMedia({ audio: audioConstraints('', originalSound), video: true }).catch(() =>
-            navigator.mediaDevices.getUserMedia({ audio: audioConstraints('', originalSound) }),
+          return navigator.mediaDevices.getUserMedia({ audio: fallbackAudio, video: true }).catch(() =>
+            fallbackAudio ? navigator.mediaDevices.getUserMedia({ audio: fallbackAudio }) : new MediaStream(),
           );
         }
         throw e;
       });
-      micTrack.current = stream.getAudioTracks()[0] ?? null;
+      micTrack.current = rigVoice ?? stream.getAudioTracks()[0] ?? null;
       camTrack.current = stream.getVideoTracks()[0] ?? null;
       const ctx = getAudioContext();
       await ctx.resume();
@@ -364,7 +372,7 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
   };
 
   const restartMic = async (deviceId: string, original: boolean) => {
-    if (!inCall) return;
+    if (!inCall || voiceRef.current) return; // the rig's voice input is in use (iOS app)
     try {
       const s = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints(deviceId, original) });
       micTrack.current?.stop();
@@ -376,6 +384,22 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       setError(`Microphone unavailable: ${(e as Error).message}`);
     }
   };
+
+  // iOS app: the rig turned on or off mid-call; swap between its voice input and the regular mic.
+  useEffect(() => {
+    if (!inCall) return;
+    const rigVoice = rigVoiceTrack();
+    if (!rigVoice) {
+      restartMic(micId, originalSound);
+      return;
+    }
+    micTrack.current?.stop();
+    micTrack.current = rigVoice;
+    rigVoice.enabled = mic;
+    connectMic();
+    syncTracks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voiceStream]);
 
   const selectMic = (id: string) => {
     setMicId(id);

@@ -66,7 +66,7 @@ interface Props {
 export function Room({ session, profile, onLeave }: Props) {
   const room = useRoom(session, profile);
   const rig = useRig();
-  const call = useCall(room, rig.callStream);
+  const call = useCall(room, rig.callStream, rig.voiceStream);
   const scoreRef = useRef<ScoreViewHandle>(null);
 
   const [api, setApi] = useState<alphaTab.AlphaTabApi | null>(null);

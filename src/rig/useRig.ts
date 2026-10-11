@@ -47,6 +47,8 @@ export function useRig() {
   const [outputs, setOutputs] = useState<Device[]>([]);
   const [inputId, setInputId] = useState(pref(devKey('inputId')));
   const [channel, setChannel] = useState<Channel>(pref(devKey('channel')) || '1');
+  // iOS app: which interface input carries your voice into the call while the rig is on ('' = none).
+  const [voiceChannel, setVoiceChannel] = useState<Channel>(pref('native.voiceChannel'));
   const [outputId, setOutputId] = useState(pref(devKey('outputId')));
   const [nativeDevices, setNativeDevices] = useState<NativeDevice[]>([]);
   const [bufferSize, setBufferSize] = useState(Number(pref('native.bufferSize')) || 128);
@@ -91,7 +93,8 @@ export function useRig() {
   const workletLoaded = useRef(false);
   const wasmBytes = useRef<ArrayBuffer | null>(null);
   // Desktop app only: the call feed fed by the engine, its sample rate, and the IR file (re-sent on every engine start).
-  const feed = useRef<{ ctx: AudioContext; node: AudioWorkletNode } | null>(null);
+  const feed = useRef<{ ctx: AudioContext; node: AudioWorkletNode; voice: AudioWorkletNode | null } | null>(null);
+  const [voiceStream, setVoiceStream] = useState<MediaStream | null>(null);
   const engineRate = useRef(48000);
   const irBytes = useRef<ArrayBuffer | null>(null);
 
@@ -202,6 +205,7 @@ export function useRig() {
     feed.current?.ctx.close();
     feed.current = null;
     setInstrumentStream(null);
+    setVoiceStream(null);
     setOn(false);
     setLevel(0);
   }, []);
@@ -256,8 +260,17 @@ export function useRig() {
     const node = new AudioWorkletNode(ctx, 'pcm-feed', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
     const dest = ctx.createMediaStreamDestination();
     node.connect(dest);
+    // iOS app: the voice input arrives the same way and becomes the call's mic (see useCall), since iOS can't use the
+    // built-in mic while the interface is the input. Silent when no voice input is picked.
+    let voice: AudioWorkletNode | null = null;
+    if (native?.platform === 'ios') {
+      voice = new AudioWorkletNode(ctx, 'pcm-feed', { numberOfInputs: 0, numberOfOutputs: 1, outputChannelCount: [1] });
+      const voiceDest = ctx.createMediaStreamDestination();
+      voice.connect(voiceDest);
+      setVoiceStream(voiceDest.stream);
+    }
     feed.current?.ctx.close();
-    feed.current = { ctx, node };
+    feed.current = { ctx, node, voice };
     setInstrumentStream(dest.stream);
     setOn(true);
     // Plugins are (re)loaded on every start with their saved settings, so a restarted engine comes back the same.
@@ -287,6 +300,7 @@ export function useRig() {
       else if (m.type === 'modelLoaded') setModelStatus(m.ok ? 'ok' : 'error');
       else if (m.type === 'level') setLevel(m.peak);
       else if (m.type === 'pcm') feed.current?.node.port.postMessage(m.samples, [m.samples.buffer]);
+      else if (m.type === 'voice') feed.current?.voice?.port.postMessage(m.samples, [m.samples.buffer]);
       else if (m.type === 'vstList') {
         setVstAvailable(m.available);
         setVstPlugins(m.plugins);
@@ -340,9 +354,9 @@ export function useRig() {
     if (!native || !on) return;
     native.send({
       type: 'params',
-      params: { channel: Number(channel) - 1, inGain: dbToGain(inputDb), outGain: dbToGain(outputDb), monitor, bypass },
+      params: { channel: Number(channel) - 1, inGain: dbToGain(inputDb), outGain: dbToGain(outputDb), monitor, bypass, voiceChannel: Number(voiceChannel || 0) - 1 },
     });
-  }, [on, channel, inputDb, outputDb, monitor, bypass]);
+  }, [on, channel, inputDb, outputDb, monitor, bypass, voiceChannel]);
 
   useEffect(() => {
     nodes.current?.nam.port.postMessage({ type: 'bypass', value: bypass });
@@ -519,6 +533,15 @@ export function useRig() {
     latencyMs,
     /** Processed instrument signal for the call (null when the rig is off or not sending). */
     callStream: sendToCall ? instrumentStream : null,
+    /** iOS app with the rig on: replaces the mic in the call (null otherwise). */
+    voiceStream,
+    /** iOS app: the voice input picker applies (iOS uses one input device, so voice comes from the interface). */
+    voiceSupported: native?.platform === 'ios',
+    voiceChannel,
+    selectVoiceChannel: (ch: Channel) => {
+      setVoiceChannel(ch);
+      savePref('native.voiceChannel', ch);
+    },
     start,
     stop,
     selectInput,
