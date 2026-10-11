@@ -1,0 +1,10 @@
+node_modules
+dist
+data
+public/font
+public/soundfont
+.git
+.github
+.playwright-mcp
+*.log
+desktop

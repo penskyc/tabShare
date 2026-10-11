@@ -1,0 +1,24 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>TONE3000 · tabShare</title>
+    <style>
+      body { background: #0e0e13; color: #ecebf3; font: 15px system-ui, sans-serif; display: grid; place-items: center; height: 100vh; margin: 0; }
+    </style>
+  </head>
+  <body>
+    <p id="msg">Returning to tabShare…</p>
+    <script>
+      // Relays the OAuth redirect (code, state, tone_id, error) back to the tabShare window that opened this popup.
+      const q = new URLSearchParams(location.search);
+      const params = Object.fromEntries(['code', 'state', 'tone_id', 'error', 'canceled'].map((k) => [k, q.get(k)]));
+      if (window.opener) {
+        window.opener.postMessage({ type: 't3k-callback', params }, location.origin);
+        window.close();
+      } else {
+        document.getElementById('msg').textContent = 'You can close this window and go back to tabShare.';
+      }
+    </script>
+  </body>
+</html>

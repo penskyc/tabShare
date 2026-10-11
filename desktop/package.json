@@ -1,0 +1,98 @@
+{
+  "name": "tabshare-desktop",
+  "productName": "tabShare",
+  "version": "0.3.0",
+  "description": "tabShare desktop: connects to a tabShare server, with a low-latency ASIO / Core Audio amp engine and VST3 hosting.",
+  "author": "Corey Pensky",
+  "private": true,
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test *.test.mjs native/vst.test.mjs",
+    "dist": "electron-builder",
+    "publish": "electron-builder --win --publish always",
+    "build:native": "cmake-js build -d native -O native/build --runtime=electron --runtime-version=44.7.0 --CDCMAKE_BUILD_TYPE=Release",
+    "publish:mac": "APPLE_KEYCHAIN_PROFILE=tabshare electron-builder --mac --publish always",
+    "dist:mac": "APPLE_KEYCHAIN_PROFILE=tabshare electron-builder --mac"
+  },
+  "build": {
+    "appId": "dev.coreypensky.tabshare",
+    "productName": "tabShare",
+    "artifactName": "tabShare-Setup.${ext}",
+    "files": [
+      "main.js",
+      "preload.cjs",
+      "engine.mjs",
+      "convolver.mjs",
+      "picker.html",
+      "picker-preload.cjs",
+      "package.json",
+      "native/build/Release/tabshare_vst.node",
+      "native/build/Release/tabshare_plugin_host",
+      "connect.html",
+      "connect-preload.cjs"
+    ],
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "penskyc",
+        "repo": "tabShare",
+        "releaseType": "release"
+      }
+    ],
+    "win": {
+      "target": "nsis",
+      "artifactName": "tabShare-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "arm64"
+          ]
+        }
+      ],
+      "artifactName": "tabShare-${version}-mac.${ext}",
+      "category": "public.app-category.music",
+      "hardenedRuntime": true,
+      "extendInfo": {
+        "NSMicrophoneUsageDescription": "tabShare uses your audio interface for the amp rig, and your microphone for calls.",
+        "NSCameraUsageDescription": "tabShare uses your camera for video calls."
+      },
+      "entitlements": "resources/entitlements.mac.plist",
+      "entitlementsInherit": "resources/entitlements.mac.plist",
+      "sign": "resources/sign.cjs"
+    },
+    "dmg": {
+      "artifactName": "tabShare.dmg"
+    },
+    "asarUnpack": [
+      "native/build/Release/*"
+    ]
+  },
+  "dependencies": {
+    "@opendaw/nam-wasm": "^1.2.0",
+    "audify": "^1.10.1",
+    "electron-updater": "^6.8.9"
+  },
+  "devDependencies": {
+    "cmake-js": "^8.0.0",
+    "electron": "^44.7.0",
+    "electron-builder": "^26.15.3",
+    "node-addon-api": "^8.9.2",
+    "playwright-core": "^1.64.0"
+  },
+  "license": "AGPL-3.0"
+}

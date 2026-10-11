@@ -1,0 +1,434 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>tabShare: guitar tabs, played together</title>
+    <meta name="description" content="Multiplayer guitar tabs: shared scores, live cursors, jam-synced playback, video calls, and a low-latency amp rig with NAM models and VST3 plugins." />
+    <meta property="og:title" content="tabShare: guitar tabs, played together" />
+    <meta property="og:description" content="Open a tab. Invite the band. Everyone sees the same score, hears the same mix, and plays along together." />
+    <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%230e0e13'/%3E%3Cg stroke='%23ecebf3' stroke-opacity='.35'%3E%3Cpath d='M5 9h22M5 13h22M5 17h22M5 21h22'/%3E%3C/g%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='monospace' font-weight='700' font-size='15' fill='%23ff7a3d'%3E5%3C/text%3E%3C/svg%3E" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;700&family=JetBrains+Mono:wght@400;600&family=Instrument+Serif:ital@0;1&display=swap" rel="stylesheet" />
+    <style>
+      :root {
+        --bg: #0e0e13;
+        --bg-2: #15151d;
+        --panel: #1b1b25;
+        --line: #2a2a38;
+        --text: #ecebf3;
+        --soft: #cfcde0;
+        --muted: #8d8ba3;
+        --accent: #ff7a3d;
+        --accent-2: #ffb347;
+        --mike: #5ce1a5;
+        --corey: #8b7bff;
+        --sans: 'Space Grotesk', system-ui, sans-serif;
+        --mono: 'JetBrains Mono', ui-monospace, monospace;
+        --serif: 'Instrument Serif', Georgia, serif;
+        --pad: clamp(16px, 5vw, 72px);
+        color-scheme: dark;
+      }
+      * { box-sizing: border-box; }
+      html { scroll-behavior: smooth; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.55 var(--sans); overflow-x: hidden; }
+      a { color: inherit; }
+      img { max-width: 100%; height: auto; display: block; }
+      ::selection { background: var(--accent); color: var(--bg); }
+
+      /* grain, so the dark doesn't feel flat */
+      body::before {
+        content: ''; position: fixed; inset: 0; pointer-events: none; z-index: 50; opacity: 0.05;
+        background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+      }
+
+      /* ---------- nav ---------- */
+      nav {
+        position: sticky; top: 0; z-index: 20; display: flex; align-items: center; gap: 24px;
+        padding: 14px var(--pad); background: rgba(14, 14, 19, 0.78); backdrop-filter: blur(12px);
+        border-bottom: 1px solid rgba(42, 42, 56, 0.6);
+      }
+      .wordmark { font-weight: 700; letter-spacing: -0.04em; text-decoration: none; font-size: 22px; }
+      .wordmark span { color: var(--accent); }
+      nav .links { display: flex; align-items: center; gap: 22px; margin-left: auto; font-size: 14px; }
+      nav .links a { color: var(--muted); text-decoration: none; transition: color 0.2s; }
+      nav .links a:hover { color: var(--text); }
+
+      .btn {
+        display: inline-flex; align-items: center; gap: 10px; padding: 13px 20px; border-radius: 10px; font-weight: 500;
+        text-decoration: none; border: 1px solid var(--line); background: var(--panel); transition: transform 0.15s, border-color 0.2s, background 0.2s;
+        white-space: nowrap;
+      }
+      .btn:hover { transform: translateY(-1px); border-color: #3a3a4d; }
+      .btn.primary { background: var(--accent); color: #1a0d05; border-color: var(--accent); }
+      .btn.primary:hover { background: #ff8b55; }
+      .btn small { font: 400 11px var(--mono); color: var(--muted); }
+      .btn.primary small { color: #5a2a10; }
+      nav .btn { padding: 8px 14px; font-size: 14px; }
+
+      /* ---------- hero ---------- */
+      .hero {
+        position: relative; padding: clamp(48px, 9vh, 110px) var(--pad) 40px; overflow: hidden;
+        background: radial-gradient(900px 480px at 85% 10%, rgba(255, 122, 61, 0.13), transparent 65%),
+          radial-gradient(1100px 520px at -10% 110%, #3b1a0c, transparent 60%), var(--bg);
+      }
+      .eyebrow { font: 500 12px var(--mono); letter-spacing: 0.14em; text-transform: uppercase; color: var(--accent); margin: 0 0 18px; }
+      h1 { margin: 0; font-size: clamp(56px, 12vw, 168px); font-weight: 700; letter-spacing: -0.055em; line-height: 0.88; }
+      h1 span { color: var(--accent); }
+      .lede { max-width: 33ch; font-size: clamp(19px, 2.2vw, 26px); color: var(--soft); line-height: 1.35; margin: 26px 0 32px; }
+      .lede em, h2 em { font-family: var(--serif); font-style: italic; font-weight: 400; color: var(--text); letter-spacing: 0; }
+      .ctas { display: flex; flex-wrap: wrap; gap: 12px; }
+      .note { margin-top: 14px; font: 12px var(--mono); color: var(--muted); }
+
+      /* the moving staff */
+      .stage { margin-top: clamp(40px, 7vh, 80px); position: relative; }
+      .stage svg { width: 100%; height: auto; display: block; overflow: visible; }
+      .stage .string { stroke: var(--text); stroke-opacity: 0.22; }
+      .stage .bar { stroke: var(--text); stroke-opacity: 0.35; }
+      .stage .fret { font: 600 15px var(--mono); fill: var(--text); }
+      .stage .fret-bg { fill: var(--bg); }
+      .stage .barnum { font: 600 11px var(--mono); fill: #ff5d5d; }
+      .stage .playhead { stroke: var(--accent); stroke-width: 2.5; filter: drop-shadow(0 0 8px rgba(255, 122, 61, 0.8)); }
+      .stage .loop { fill: var(--accent); opacity: 0.09; }
+      .stage .sel { fill: var(--mike); opacity: 0.12; stroke: var(--mike); stroke-opacity: 0.45; stroke-dasharray: 4 4; }
+      .stage .tag { font: 600 11px var(--sans); }
+      .ph { animation: play 9s linear infinite; }
+      @keyframes play { from { transform: translateX(0); } to { transform: translateX(1040px); } }
+      .cursor-mike { animation: driftA 7s ease-in-out infinite alternate; }
+      .cursor-corey { animation: driftB 9s ease-in-out infinite alternate; }
+      @keyframes driftA { 0% { transform: translate(560px, 26px); } 50% { transform: translate(650px, 70px); } 100% { transform: translate(600px, 44px); } }
+      @keyframes driftB { 0% { transform: translate(250px, 96px); } 60% { transform: translate(330px, 60px); } 100% { transform: translate(290px, 104px); } }
+
+      /* ---------- sections as bars of a score ---------- */
+      section.bar-sec { position: relative; padding: clamp(64px, 10vh, 120px) var(--pad); border-top: 1px solid var(--line); }
+      .barno { position: absolute; top: 22px; left: var(--pad); font: 600 12px var(--mono); color: #ff5d5d; }
+      .barno::after { content: ''; display: inline-block; width: 46px; height: 1px; background: var(--line); vertical-align: middle; margin-left: 10px; }
+      .split { display: grid; grid-template-columns: minmax(0, 0.9fr) minmax(0, 1.25fr); gap: clamp(32px, 5vw, 80px); align-items: center; }
+      .split.flip { grid-template-columns: minmax(0, 1.25fr) minmax(0, 0.9fr); }
+      .split.flip .copy { order: 2; }
+      h2 { margin: 0 0 18px; font-size: clamp(34px, 5vw, 64px); line-height: 0.98; letter-spacing: -0.04em; font-weight: 700; }
+      .copy > p { color: var(--soft); font-size: 18px; max-width: 46ch; margin: 0 0 26px; }
+
+      /* feature list styled as frets on a string */
+      .frets { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+      .frets li { position: relative; display: grid; grid-template-columns: 36px 1fr; gap: 14px; padding: 10px 0; align-items: baseline; }
+      .frets li::before {
+        content: ''; position: absolute; left: 0; right: 0; top: 50%; height: 1px; background: linear-gradient(90deg, var(--line), transparent);
+        z-index: 0;
+      }
+      .frets b {
+        position: relative; z-index: 1; justify-self: start; font: 600 13px var(--mono); color: var(--accent); background: var(--bg);
+        padding: 0 6px 0 0;
+      }
+      .frets span { position: relative; z-index: 1; background: var(--bg); padding-right: 10px; justify-self: start; }
+      .frets span i { font-style: normal; color: var(--muted); font-size: 14px; }
+
+      .shot {
+        position: relative; border-radius: 14px; overflow: hidden; border: 1px solid var(--line); background: var(--bg-2);
+        box-shadow: 0 40px 80px -30px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(255, 255, 255, 0.02) inset;
+      }
+      .shot::after {
+        content: attr(data-label); position: absolute; left: 14px; bottom: 12px; font: 600 11px var(--mono); padding: 5px 9px;
+        border-radius: 6px; background: rgba(14, 14, 19, 0.85); color: var(--soft); border: 1px solid var(--line);
+      }
+      .shot:not([data-label])::after { display: none; }
+      .shot.label-tr::after { left: auto; right: 14px; bottom: auto; top: 12px; }
+      .shot-pair { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; }
+      .shot-pair .shot:last-child { margin-top: 48px; }
+      .tall { max-width: 360px; justify-self: center; }
+
+      /* latency comparison */
+      .latency { display: grid; gap: 14px; margin: 6px 0 30px; max-width: 520px; }
+      .lat-row { display: grid; grid-template-columns: 112px 1fr 76px; gap: 12px; align-items: center; font: 13px var(--mono); color: var(--muted); }
+      .lat-row .track { height: 10px; border-radius: 99px; background: var(--bg-2); border: 1px solid var(--line); overflow: hidden; }
+      .lat-row .fill { height: 100%; border-radius: 99px; background: var(--muted); transform-origin: left; animation: grow 1.4s cubic-bezier(.2, .7, .2, 1) both; }
+      .lat-row.fast .fill { background: linear-gradient(90deg, var(--accent), var(--accent-2)); }
+      .lat-row.fast { color: var(--text); }
+      .lat-row b { color: var(--text); font-weight: 600; text-align: right; }
+      @keyframes grow { from { transform: scaleX(0); } }
+
+      .platforms { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+      .platform { border: 1px solid var(--line); border-radius: 14px; padding: 22px; background: linear-gradient(180deg, var(--panel), var(--bg-2)); }
+      .platform h3 { margin: 0 0 6px; font-size: 20px; letter-spacing: -0.02em; }
+      .platform p { margin: 0 0 18px; color: var(--muted); font-size: 14px; }
+      .platform .btn { width: 100%; justify-content: center; }
+
+      /* everything else */
+      .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 260px), 1fr)); gap: 1px; background: var(--line); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; }
+      .cell { background: var(--bg); padding: 26px 24px 28px; transition: background 0.25s; }
+      .cell:hover { background: var(--bg-2); }
+      .cell .n { font: 600 12px var(--mono); color: var(--accent); }
+      .cell h3 { margin: 10px 0 6px; font-size: 18px; letter-spacing: -0.01em; }
+      .cell p { margin: 0; color: var(--muted); font-size: 14px; }
+      .grid-head { display: flex; justify-content: space-between; align-items: end; gap: 24px; flex-wrap: wrap; margin-bottom: 32px; }
+      .grid-head h2 { margin: 0; }
+      .grid-head p { color: var(--muted); max-width: 40ch; margin: 0; }
+
+      footer { padding: 56px var(--pad) 64px; border-top: 1px solid var(--line); display: flex; flex-wrap: wrap; gap: 24px; justify-content: space-between; align-items: end; }
+      footer p { margin: 0; color: var(--muted); font-size: 14px; max-width: 52ch; }
+      .staff-foot { height: 52px; margin-top: 18px; background: repeating-linear-gradient(180deg, rgba(236, 235, 243, 0.18) 0 1px, transparent 1px 10px); width: min(320px, 100%); }
+
+      /* load-in */
+      .rise { animation: rise 0.9s cubic-bezier(.2, .7, .2, 1) both; }
+      .d1 { animation-delay: 0.08s; } .d2 { animation-delay: 0.18s; } .d3 { animation-delay: 0.3s; } .d4 { animation-delay: 0.45s; }
+      @keyframes rise { from { opacity: 0; transform: translateY(18px); } }
+      .reveal { opacity: 0; transform: translateY(26px); transition: opacity 0.8s ease, transform 0.8s cubic-bezier(.2, .7, .2, 1); }
+      .reveal.in { opacity: 1; transform: none; }
+      @media (prefers-reduced-motion: reduce) {
+        *, *::before, *::after { animation: none !important; transition: none !important; }
+        .reveal { opacity: 1; transform: none; }
+      }
+
+      /* ---------- responsive ---------- */
+      @media (max-width: 960px) {
+        .split, .split.flip { grid-template-columns: minmax(0, 1fr); }
+        .split.flip .copy { order: 0; }
+        .shot-pair .shot:last-child { margin-top: 0; }
+      }
+      @media (max-width: 720px) {
+        nav { gap: 12px; }
+        nav .links a:not(.btn) { display: none; }
+        .platforms { grid-template-columns: 1fr; }
+        .shot-pair { grid-template-columns: 1fr; }
+        .tall { max-width: 300px; }
+        /* the fretboard is too wide to shrink to a phone: show it at a readable size and let it scroll sideways */
+        .shot.wide { overflow-x: auto; }
+        .shot.wide img { width: 760px; max-width: none; }
+        .shot.label-tr::after { display: none; }
+        .ctas .btn { flex: 1 1 100%; justify-content: center; }
+        .lat-row { grid-template-columns: 92px 1fr 64px; font-size: 12px; }
+        .barno { top: 18px; }
+        /* the staff at double size, showing the first two bars, so the frets stay readable */
+        .stage { overflow: hidden; margin-right: calc(-1 * var(--pad)); }
+        .stage svg { width: 200%; }
+        .shot-pair .shot { max-width: 340px; width: 100%; justify-self: center; }
+      }
+    </style>
+  </head>
+  <body>
+    <nav>
+      <a class="wordmark" href="#top">tab<span>Share</span></a>
+      <div class="links">
+        <a href="#together">Play together</a>
+        <a href="#practice">Practice</a>
+        <a href="#rig">Amp rig</a>
+        <a href="#desktop">Desktop app</a>
+        <a class="btn primary" href="/#/">Log in</a>
+      </div>
+    </nav>
+
+    <header class="hero" id="top">
+      <p class="eyebrow rise">Guitar tabs · multiplayer</p>
+      <h1 class="rise d1">tab<span>Share</span></h1>
+      <p class="lede rise d2">Open a tab. Invite the band. Everyone sees the same score, hears the same mix, and <em>plays along together.</em></p>
+      <div class="ctas rise d3">
+        <a class="btn primary" href="/#/">Log in <small>in your browser</small></a>
+        <a class="btn" href="https://github.com/penskyc/tabShare/releases/latest/download/tabShare-Setup.exe">Windows app <small>.exe</small></a>
+        <a class="btn" href="https://github.com/penskyc/tabShare/releases/latest/download/tabShare.dmg">Mac app <small>.dmg · Apple Silicon</small></a>
+      </div>
+      <p class="note rise d4">Rooms are invite-only: the host creates a room and shares the link and password.</p>
+
+      <!-- A bar of tab with a looping playhead and two friends' cursors. -->
+      <div class="stage rise d4" aria-hidden="true">
+        <svg viewBox="0 0 1100 170" preserveAspectRatio="xMidYMid meet">
+          <rect class="loop" x="20" y="18" width="520" height="130" rx="3" />
+          <rect class="sel" x="600" y="18" width="250" height="130" rx="3" />
+          <g>
+            <line class="string" x1="0" x2="1100" y1="28" y2="28" />
+            <line class="string" x1="0" x2="1100" y1="50" y2="50" />
+            <line class="string" x1="0" x2="1100" y1="72" y2="72" />
+            <line class="string" x1="0" x2="1100" y1="94" y2="94" />
+            <line class="string" x1="0" x2="1100" y1="116" y2="116" />
+            <line class="string" x1="0" x2="1100" y1="138" y2="138" />
+            <line class="bar" x1="20" x2="20" y1="28" y2="138" />
+            <line class="bar" x1="280" x2="280" y1="28" y2="138" />
+            <line class="bar" x1="540" x2="540" y1="28" y2="138" />
+            <line class="bar" x1="800" x2="800" y1="28" y2="138" />
+            <line class="bar" x1="1060" x2="1060" y1="28" y2="138" />
+            <text class="barnum" x="24" y="14">1</text>
+            <text class="barnum" x="284" y="14">2</text>
+            <text class="barnum" x="544" y="14">3</text>
+            <text class="barnum" x="804" y="14">4</text>
+          </g>
+          <!-- the riff everyone learns first, on the D and G strings -->
+          <g class="frets-svg">
+            <g transform="translate(60 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">0</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">0</text></g>
+            <g transform="translate(130 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">3</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">3</text></g>
+            <g transform="translate(205 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">5</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">5</text></g>
+            <g transform="translate(320 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">0</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">0</text></g>
+            <g transform="translate(385 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">3</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">3</text></g>
+            <g transform="translate(445 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">6</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">6</text></g>
+            <g transform="translate(500 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">5</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">5</text></g>
+            <g transform="translate(580 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">0</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">0</text></g>
+            <g transform="translate(645 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">3</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">3</text></g>
+            <g transform="translate(720 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">5</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">5</text></g>
+            <g transform="translate(870 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">3</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">3</text></g>
+            <g transform="translate(950 0)"><rect class="fret-bg" x="-8" y="62" width="16" height="20" /><text class="fret" x="0" y="77" text-anchor="middle">0</text><rect class="fret-bg" x="-8" y="84" width="16" height="20" /><text class="fret" x="0" y="99" text-anchor="middle">0</text></g>
+          </g>
+          <g class="ph"><line class="playhead" x1="20" x2="20" y1="18" y2="148" /></g>
+          <!-- Mike -->
+          <g class="cursor-mike">
+            <path d="M0 0 L0 20 L5 15 L9 24 L13 22 L9 13 L16 13 Z" fill="var(--mike)" stroke="#0e0e13" stroke-width="1.5" />
+            <rect x="14" y="22" width="44" height="20" rx="5" fill="var(--mike)" />
+            <text class="tag" x="36" y="36" text-anchor="middle" fill="#0e0e13">Mike</text>
+          </g>
+          <!-- Corey -->
+          <g class="cursor-corey">
+            <path d="M0 0 L0 20 L5 15 L9 24 L13 22 L9 13 L16 13 Z" fill="var(--corey)" stroke="#0e0e13" stroke-width="1.5" />
+            <rect x="14" y="22" width="50" height="20" rx="5" fill="var(--corey)" />
+            <text class="tag" x="39" y="36" text-anchor="middle" fill="#0e0e13">Corey</text>
+          </g>
+        </svg>
+      </div>
+    </header>
+
+    <section class="bar-sec" id="together">
+      <span class="barno">1</span>
+      <div class="split">
+        <div class="copy reveal">
+          <h2>Same score.<br /><em>Same moment.</em></h2>
+          <p>Everyone in the room sees the same tab, live. Jam sync keeps playback, speed and the whole mix together, so when you hit play, the band hears it with you.</p>
+          <ul class="frets">
+            <li><b>0</b><span>Live cursors, selections and playheads <i>· per person, in their colour</i></span></li>
+            <li><b>3</b><span>Jam sync <i>· play, pause, seek, speed, tracks, mute/solo, volume</i></span></li>
+            <li><b>5</b><span>Shared loops <i>· select a passage, loop it for the room</i></span></li>
+            <li><b>7</b><span>Synth or the original <i>· a YouTube recording, tap-synced to the bars</i></span></li>
+          </ul>
+        </div>
+        <figure class="shot reveal" data-label="Mike's cursor and selection, live" style="margin: 0">
+          <img src="img/score.jpg" alt="A shared tab of Smoke On The Water with another player's cursor and highlighted selection" loading="lazy" width="1440" height="880" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="bar-sec">
+      <span class="barno">2</span>
+      <div class="split flip">
+        <div class="copy reveal">
+          <h2>Any song,<br /><em>one search away.</em></h2>
+          <p>Search Songsterr from the library and add a song for the whole room in a second, with every track. Or drop in your own files, or write a tab right in the app.</p>
+          <ul class="frets">
+            <li><b>0</b><span>Songsterr search and import <i>· all tracks, named</i></span></li>
+            <li><b>2</b><span>Guitar Pro 3–8, MusicXML, Capella <i>· drag and drop</i></span></li>
+            <li><b>4</b><span>alphaTex editor <i>· write tabs as text</i></span></li>
+            <li><b>5</b><span>Per-track view, mute, solo and volume</span></li>
+          </ul>
+        </div>
+        <div class="shot-pair reveal">
+          <figure class="shot" data-label="Library + Songsterr" style="margin: 0"><img src="img/songsterr.jpg" alt="Songsterr search results in the library panel" loading="lazy" width="1040" height="1200" /></figure>
+          <figure class="shot" data-label="Lobby" style="margin: 0"><img src="img/lobby.jpg" alt="The tabShare lobby" loading="lazy" width="2880" height="1760" /></figure>
+        </div>
+      </div>
+    </section>
+
+    <section class="bar-sec" id="practice">
+      <span class="barno">3</span>
+      <div class="split">
+        <div class="copy reveal">
+          <h2>Learn it<br /><em>on the neck.</em></h2>
+          <p>A fretboard under the tab shows any scale or arpeggio in any tuning, or follows a track and lights up the notes it plays as the song goes. Tune up without leaving the room.</p>
+          <ul class="frets">
+            <li><b>0</b><span>Follow a track <i>· its notes light up under the playhead, in its own tuning</i></span></li>
+            <li><b>2</b><span>Scales and arpeggios <i>· 14 scales, any root, note names or intervals</i></span></li>
+            <li><b>3</b><span>Guitar and bass <i>· 4- to 7-string tunings, left-handed, up to 24 frets</i></span></li>
+            <li><b>5</b><span>Chromatic tuner <i>· listens to your rig's dry input, or your mic</i></span></li>
+            <li><b>7</b><span>Zoom the tab <i>· 50–200 %, remembered on each device</i></span></li>
+          </ul>
+        </div>
+        <figure class="shot tall reveal" style="margin: 0">
+          <img src="img/tuner.jpg" alt="The tuner showing A1 in tune on a bass" loading="lazy" width="640" height="524" />
+        </figure>
+      </div>
+      <figure class="shot label-tr wide reveal" data-label="Following the bass track" style="margin: clamp(32px, 5vw, 56px) 0 0">
+        <img src="img/fretboard.jpg" alt="A bass fretboard in G minor pentatonic, with the note the bass track is playing lit up" loading="lazy" width="2320" height="436" />
+      </figure>
+    </section>
+
+    <section class="bar-sec" id="rig">
+      <span class="barno">4</span>
+      <div class="split">
+        <div class="copy reveal">
+          <h2>Plug in.<br /><em>Sound like you.</em></h2>
+          <p>Bring your guitar or bass into the room through a neural amp model, a cab IR and your favourite plugins, then send that tone straight into the call.</p>
+          <ul class="frets">
+            <li><b>0</b><span>NAM amp models <i>· local .nam files or browse TONE3000</i></span></li>
+            <li><b>2</b><span>Cab impulse responses</span></li>
+            <li><b>3</b><span>VST3 plugins <i>· before or after the amp, on/off switch, search, their own windows (desktop app)</i></span></li>
+            <li><b>5</b><span>Video and voice call <i>· pop out split screen, picture-in-picture, pick a screen to share, "original sound" for instruments</i></span></li>
+            <li><b>7</b><span>Chat <i>· with link previews</i></span></li>
+          </ul>
+        </div>
+        <figure class="shot tall reveal" data-label="Desktop app rig" style="margin: 0">
+          <img src="img/rig-desktop.jpg" alt="Rig panel with two VST3 plugins, each with an on/off switch, and plugin search" loading="lazy" width="556" height="1102" />
+        </figure>
+      </div>
+    </section>
+
+    <section class="bar-sec" id="desktop">
+      <span class="barno">5</span>
+      <div class="split flip">
+        <div class="copy reveal">
+          <h2>The desktop app<br /><em>gets out of the way.</em></h2>
+          <p>Same rooms, same site, plus a native audio engine. Your interface runs through ASIO on Windows and Core Audio on Mac, so you hear yourself without the browser's delay. It also hosts your VST3 plugins, and it updates itself.</p>
+          <div class="latency" role="img" aria-label="Hearing yourself: browser about 50 to 70 milliseconds, desktop app about 5 to 25 milliseconds depending on buffer size">
+            <div class="lat-row"><span>Browser</span><div class="track"><div class="fill" style="width: 100%"></div></div><b>50–70 ms</b></div>
+            <div class="lat-row fast"><span>Desktop app</span><div class="track"><div class="fill" style="width: 22%"></div></div><b>5–25 ms</b></div>
+          </div>
+        </div>
+        <div class="platforms reveal">
+          <div class="platform">
+            <h3>Windows</h3>
+            <p>ASIO, real-time audio thread, VST3, in-app updates. First install: SmartScreen → More info → Run anyway.</p>
+            <a class="btn primary" href="https://github.com/penskyc/tabShare/releases/latest/download/tabShare-Setup.exe">Download .exe</a>
+          </div>
+          <div class="platform">
+            <h3>macOS</h3>
+            <p>Core Audio, VST3 in a separate plugin-host process, in-app updates. Apple Silicon, signed and notarized.</p>
+            <a class="btn primary" href="https://github.com/penskyc/tabShare/releases/latest/download/tabShare.dmg">Download .dmg</a>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="bar-sec">
+      <span class="barno">6</span>
+      <div class="grid-head reveal">
+        <h2>The whole <em>set list.</em></h2>
+        <p>Everything tabShare does today, in a browser or the desktop app.</p>
+      </div>
+      <div class="grid reveal">
+        <div class="cell"><span class="n">01</span><h3>Invite-only rooms</h3><p>Password rooms with invite links; the host manages them from an admin page.</p></div>
+        <div class="cell"><span class="n">02</span><h3>Tabs that render</h3><p>Guitar Pro, MusicXML and alphaTex, drawn as notation + tab by alphaTab.</p></div>
+        <div class="cell"><span class="n">03</span><h3>Songsterr import</h3><p>Search and add a song for the whole room, every track included.</p></div>
+        <div class="cell"><span class="n">04</span><h3>Presence</h3><p>See everyone's cursor, selection and playhead as they move.</p></div>
+        <div class="cell"><span class="n">05</span><h3>Jam sync</h3><p>Transport and the full mix shared by everyone who opts in. Late joiners catch up.</p></div>
+        <div class="cell"><span class="n">06</span><h3>Practice tools</h3><p>Speed trainer, metronome, count-in, shared or personal loops, and zoom for the tab.</p></div>
+        <div class="cell"><span class="n">07</span><h3>Original audio</h3><p>Switch the synth for the real recording on YouTube, synced bar by bar.</p></div>
+        <div class="cell"><span class="n">08</span><h3>Call + chat</h3><p>Video and voice for a few friends, share the screen you pick, chat with link previews.</p></div>
+        <div class="cell"><span class="n">09</span><h3>Amp rig</h3><p>NAM models from disk or TONE3000, cab IRs, all mixed into the call.</p></div>
+        <div class="cell"><span class="n">10</span><h3>Native engine</h3><p>ASIO / Core Audio monitoring, VST3 plugins you can switch on and off, in-app updates.</p></div>
+        <div class="cell"><span class="n">11</span><h3>Tuner + fretboard</h3><p>Tune from your rig or mic; see scales, arpeggios and the notes a track plays on the neck.</p></div>
+        <div class="cell"><span class="n">12</span><h3>Pop-out + PiP</h3><p>The call in its own window, split screen with you in the corner, or a floating box while you're elsewhere.</p></div>
+      </div>
+    </section>
+
+    <footer>
+      <div>
+        <a class="wordmark" href="#top">tab<span>Share</span></a>
+        <div class="staff-foot" aria-hidden="true"></div>
+      </div>
+      <p>Built for a few friends who play together from different houses. Rooms are private and invite-only; ask the host for a link.</p>
+      <a class="btn primary" href="/#/">Log in</a>
+    </footer>
+
+    <script>
+      // Reveal sections as they scroll in.
+      const io = new IntersectionObserver((entries) => {
+        for (const e of entries) if (e.isIntersecting) { e.target.classList.add('in'); io.unobserve(e.target); }
+      }, { threshold: 0.12 });
+      document.querySelectorAll('.reveal').forEach((el) => io.observe(el));
+    </script>
+  </body>
+</html>

@@ -1,0 +1,11 @@
+node_modules/
+dist/
+data/
+public/font/
+public/soundfont/
+*.log
+.env
+.playwright-mcp/
+.env.deploy
+CLAUDE.local.md
+.local/

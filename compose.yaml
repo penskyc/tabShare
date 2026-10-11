@@ -1,0 +1,15 @@
+# tabShare server. `docker compose up -d`, then `docker logs tabshare` for the one-time setup code and open the server
+# in a browser. Settings (admin account, public URL, TONE3000 key, API keys) are made in the app and kept in ./data.
+services:
+  tabshare:
+    image: ghcr.io/penskyc/tabshare:latest
+    container_name: tabshare
+    restart: unless-stopped # also how "Restart server" in Admin → Settings comes back
+    ports:
+      - "3001:3001" # host:container. Change the host side to use another port.
+    volumes:
+      - ./data:/data
+    # Optional:
+    # user: "1000:1000"           # run as your user (the data folder must be writable by it)
+    # environment:
+    #   SESSION_SECRET: change-me  # fixed secret, so room links survive a wiped data folder

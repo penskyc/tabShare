@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'" />
+    <title>Connect to a tabShare server</title>
+    <style>
+      :root { color-scheme: dark; --bg: #0e0e13; --panel: #1b1b25; --line: #2a2a38; --text: #ecebf3; --muted: #8d8ba3; --accent: #ff7a3d; --ok: #5ce1a5; --bad: #ff5d73; }
+      * { box-sizing: border-box; }
+      body { margin: 0; background: var(--bg); color: var(--text); font: 14px/1.45 system-ui, 'Segoe UI', sans-serif; }
+      form { display: grid; gap: 14px; padding: 22px 24px; }
+      .brand { font-weight: 700; font-size: 24px; letter-spacing: -0.04em; }
+      .brand span { color: var(--accent); }
+      h1 { margin: -6px 0 0; font-size: 16px; font-weight: 500; color: var(--muted); }
+      label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
+      input { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; width: 100%; }
+      input:focus { outline: 2px solid var(--accent); outline-offset: -1px; border-color: transparent; }
+      small { color: var(--muted); font-size: 12px; }
+      fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px 12px; margin: 0; display: grid; gap: 8px; }
+      legend { color: var(--muted); font-size: 13px; padding: 0 4px; }
+      .hdr { display: grid; grid-template-columns: 1fr 1.4fr auto; gap: 6px; }
+      button { font: inherit; color: var(--text); background: var(--panel); border: 1px solid var(--line); border-radius: 8px; padding: 8px 14px; cursor: pointer; }
+      button.primary { background: var(--accent); border-color: var(--accent); color: #1a0d05; font-weight: 600; }
+      button.link { background: none; border: 0; color: var(--accent); padding: 0; justify-self: start; }
+      button.x { padding: 6px 10px; }
+      button:disabled { opacity: 0.5; cursor: default; }
+      .row { display: flex; gap: 10px; justify-content: flex-end; align-items: center; }
+      .status { font-size: 13px; min-height: 18px; }
+      .status.ok { color: var(--ok); }
+      .status.bad { color: var(--bad); }
+    </style>
+  </head>
+  <body>
+    <form id="form">
+      <div class="brand">tab<span>Share</span></div>
+      <h1>Connect to your tabShare server</h1>
+      <label>
+        Server URL
+        <input id="url" placeholder="https://tabs.example.com" required autocomplete="url" />
+      </label>
+      <label>
+        API key
+        <input id="key" placeholder="tsk_…" autocomplete="off" spellcheck="false" />
+        <small id="keyHint">Ask the server's admin (Admin → API keys).</small>
+      </label>
+      <fieldset>
+        <legend>Extra headers <small>(optional, e.g. Cloudflare Access: CF-Access-Client-Id / CF-Access-Client-Secret)</small></legend>
+        <div id="headers"></div>
+        <button type="button" class="link" id="addHeader">+ Add header</button>
+      </fieldset>
+      <div class="status" id="status" role="status"></div>
+      <div class="row">
+        <button type="button" id="cancel" hidden>Cancel</button>
+        <button type="button" id="test">Test</button>
+        <button class="primary" id="save">Connect</button>
+      </div>
+    </form>
+    <script>
+      const $ = (id) => document.getElementById(id);
+      let hasSavedKey = false;
+      const addHeader = (name = '', value = '') => {
+        const row = document.createElement('div');
+        row.className = 'hdr';
+        row.innerHTML = '<input placeholder="Header name" spellcheck="false" /><input placeholder="Value" spellcheck="false" type="password" /><button type="button" class="x" title="Remove">✕</button>';
+        const [n, v, x] = row.children;
+        n.value = name;
+        v.value = value;
+        n.setAttribute('aria-label', 'Header name');
+        v.setAttribute('aria-label', 'Header value');
+        x.onclick = () => row.remove();
+        $('headers').append(row);
+      };
+      const read = () => ({
+        url: $('url').value.trim(),
+        apiKey: $('key').value.trim(),
+        keepKey: hasSavedKey && !$('key').value.trim(),
+        headers: [...$('headers').children].map((r) => ({ name: r.children[0].value.trim(), value: r.children[1].value })).filter((h) => h.name),
+      });
+      const show = (text, ok) => {
+        $('status').textContent = text;
+        $('status').className = 'status ' + (ok === undefined ? '' : ok ? 'ok' : 'bad');
+      };
+      $('addHeader').onclick = () => addHeader();
+      $('test').onclick = async () => {
+        show('Testing…');
+        const r = await window.connect.test(read());
+        show(r.ok ? `Connected to tabShare ${r.version}.` : r.error, r.ok);
+      };
+      $('cancel').onclick = () => window.close();
+      $('form').onsubmit = async (e) => {
+        e.preventDefault();
+        $('save').disabled = true;
+        show('Connecting…');
+        const r = await window.connect.save(read());
+        $('save').disabled = false;
+        if (!r.ok) show(r.error, false);
+      };
+      window.connect.load().then((s) => {
+        if (s.error) show(s.error, false);
+        if (!s.server) return addHeader();
+        $('url').value = s.server.url;
+        hasSavedKey = s.server.hasKey;
+        if (hasSavedKey) $('key').placeholder = 'Saved (leave empty to keep it)';
+        s.server.headers.forEach((h) => addHeader(h.name, h.value));
+        if (!s.server.headers.length) addHeader();
+        $('cancel').hidden = !s.canCancel;
+      });
+    </script>
+  </body>
+</html>
