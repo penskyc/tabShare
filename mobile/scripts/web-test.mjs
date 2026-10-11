@@ -61,6 +61,7 @@ try {
   if (params?.voiceChannel !== 1) fail(`voiceChannel sent: ${JSON.stringify(params)}`);
   await page.getByRole('button', { name: /Start call|Join call/ }).first().click();
   await page.waitForTimeout(2000);
+  if (await page.getByRole('button', { name: /Pop out/ }).count()) fail('Pop out shown in the iOS app (its web view has no windows)');
   const gum = () => page.evaluate(() => window.__gumAudio);
   if ((await gum()) !== 0) fail('call captured the mic while the rig was on');
   await page.getByRole('button', { name: /turn off rig/i }).click();

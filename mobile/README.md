@@ -38,4 +38,10 @@ sign-in sheet (`expo-web-browser`, shares Safari's login). The `state` is prefix
 the page as `authResult`. Safe areas: the WebView is edge to edge and the page pads itself
 (`viewport-fit=cover` + `env(safe-area-inset-*)` on `#root`).
 
-Not yet: background audio, Android.
+Background audio: `UIBackgroundModes: audio` keeps the rig (RemoteIO) and WebKit's audio (synth, call) running when
+the app is left or the screen locks; WebKit only keeps the web view going in the background while it plays audio.
+The call's pop-out and PiP are hidden in the app: the web view can't open windows, and WebKit's own video PiP goes
+blank once the app is left. Real PiP for calls needs native WebRTC (AVPictureInPictureController with a video-call
+view controller), i.e. moving the call out of the web view.
+
+Not yet: call PiP, Android.

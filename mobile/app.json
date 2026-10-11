@@ -15,7 +15,8 @@
         "NSMicrophoneUsageDescription": "tabShare uses your audio interface for the amp rig, and your microphone for calls.",
         "NSCameraUsageDescription": "tabShare uses your camera for video calls.",
         "ITSAppUsesNonExemptEncryption": false,
-        "UIRequiresFullScreen": false
+        "UIRequiresFullScreen": false,
+        "UIBackgroundModes": ["audio"]
       }
     },
     "plugins": [

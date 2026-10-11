@@ -7,6 +7,8 @@ import { native } from './rig/native';
 
 type DocPip = { requestWindow(opts: { width: number; height: number }): Promise<Window> };
 const docPip = (window as unknown as { documentPictureInPicture?: DocPip }).documentPictureInPicture;
+// The iOS app's web view can't open windows (pop-out, desktop PiP); WebKit's own video PiP stops once the app is left.
+const desktopApp = !!native && native.platform !== 'ios';
 
 let sharedCtx: AudioContext | null = null;
 const audioCtx = () => (sharedCtx ??= new AudioContext());
@@ -126,7 +128,7 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
   const openPopout = useCallback(() => window.open('', 'tabshare-call', 'popup,width=1100,height=680'), []);
   // Desktop: a window main.js makes borderless, always on top, bottom-right. Browser: Chrome's Document PiP.
   const openPip = useCallback(
-    () => (native ? window.open('', 'tabshare-pip', 'popup,width=360,height=203') : docPip ? docPip.requestWindow({ width: 360, height: 203 }) : null),
+    () => (desktopApp ? window.open('', 'tabshare-pip', 'popup,width=360,height=203') : docPip ? docPip.requestWindow({ width: 360, height: 203 }) : null),
     [],
   );
   const closePip = useCallback(() => {
@@ -143,12 +145,12 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
   // Desktop: pop the PiP when tabShare loses focus (switching apps), close it when you come back.
   const hasOthers = others.length > 0;
   useEffect(() => {
-    if (!native || !call.inCall || !hasOthers) return setPip(false);
+    if (!desktopApp || !call.inCall || !hasOthers) return setPip(false);
     const onFocus = () => {
       pipDismissed.current = false;
       setPip(false);
     };
-    if (native.onAppFocus) return native.onAppFocus((focused) => (focused ? onFocus() : !pipDismissed.current && setPip(true)));
+    if (native!.onAppFocus) return native!.onAppFocus((focused) => (focused ? onFocus() : !pipDismissed.current && setPip(true)));
     // Older desktop builds: the page's own blur (focus moving into an iframe, like the YouTube player, isn't leaving).
     const onBlur = () =>
       setTimeout(() => {
@@ -215,9 +217,11 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
         <button className={`call-btn ${call.cam ? '' : 'off'}`} onClick={call.toggleCam} title={call.cam ? 'Stop video' : 'Start video'}>
           📷 <span>{call.cam ? 'Stop video' : 'Start video'}</span>
         </button>
-        <button className={`call-btn ${popout ? 'on' : ''}`} onClick={() => setPopout(!popout)} title="Open the video in its own window (split screen, full screen)">
-          ⧉ <span>Pop out</span>
-        </button>
+        {(desktopApp || !native) && (
+          <button className={`call-btn ${popout ? 'on' : ''}`} onClick={() => setPopout(!popout)} title="Open the video in its own window (split screen, full screen)">
+            ⧉ <span>Pop out</span>
+          </button>
+        )}
         {!native && docPip && hasOthers && (
           <button className={`call-btn ${pip ? 'on' : ''}`} onClick={() => (pip ? closePip() : ((pipDismissed.current = false), setPip(true)))} title="Floating picture-in-picture window">
             ▣ <span>PiP</span>
