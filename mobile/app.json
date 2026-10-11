@@ -28,7 +28,8 @@
         }
       ],
       "./plugins/withSettingsBundle",
-      "./plugins/withSceneLifecycle"
+      "./plugins/withSceneLifecycle",
+      "expo-web-browser"
     ],
     "backgroundColor": "#0e0e13"
   }

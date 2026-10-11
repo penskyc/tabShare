@@ -16,6 +16,9 @@
       if (window.opener) {
         window.opener.postMessage({ type: 't3k-callback', params }, location.origin);
         window.close();
+      } else if (params.state && params.state.startsWith('app.')) {
+        // iOS app: its sign-in sheet closes when it sees this scheme and hands the URL back to the page.
+        location.replace('tabshare://t3k-callback' + location.search);
       } else {
         document.getElementById('msg').textContent = 'You can close this window and go back to tabShare.';
       }

@@ -32,5 +32,10 @@ node scripts/web-test.mjs   # web side of the iOS rig in Chrome, fake engine (ne
 TestFlight, one time: create the app in App Store Connect (My Apps → + → New App, bundle ID
 `dev.coreypensky.tabshare`). The build number is the upload time, the version is `version` in `app.json`.
 
-Not yet: TONE3000 browsing (its sign-in popup needs `window.opener`, which iOS web views don't provide; load `.nam`
-files from Files instead), background audio, Android.
+TONE3000: web views can't open the sign-in popup, so the page sends `authOpen` and the app runs it in the system
+sign-in sheet (`expo-web-browser`, shares Safari's login). The `state` is prefixed `app.`, which makes
+`public/t3k-callback.html` redirect to `tabshare://t3k-callback?…`; the sheet closes and the app returns that URL to
+the page as `authResult`. Safe areas: the WebView is edge to edge and the page pads itself
+(`viewport-fit=cover` + `env(safe-area-inset-*)` on `#root`).
+
+Not yet: background audio, Android.

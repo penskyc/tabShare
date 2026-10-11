@@ -4,6 +4,7 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, KeyboardAvoidingView, Linking, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as WebBrowser from 'expo-web-browser';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import TabshareAudio from './modules/tabshare-audio/src/TabshareAudioModule';
 import { bridgeScript, isEngineMessage } from './src/bridge';
@@ -15,6 +16,18 @@ const originOf = (url: string) => {
     return '';
   }
 };
+
+const AUTH_CALLBACK = 'tabshare://t3k-callback';
+
+/** The URL of an `authOpen` message from the page, if it's a TONE3000 page (the only sign-in the page asks for). */
+function authOpenUrl(json: string) {
+  try {
+    const m = JSON.parse(json);
+    return m?.type === 'authOpen' && typeof m.url === 'string' && m.url.startsWith('https://www.tone3000.com/') ? m.url : null;
+  } catch {
+    return null;
+  }
+}
 
 /** Normalizes what was typed ("tabs.example.com" -> https://tabs.example.com) and checks it's a tabShare server. */
 async function checkServer(input: string) {
@@ -97,18 +110,30 @@ export default function App() {
       </SafeAreaView>
     );
 
+  const toPage = (msg: object) => web.current?.injectJavaScript(`window.__tabshareNativeReceive && window.__tabshareNativeReceive(${JSON.stringify(msg)}); true;`);
+
   const onMessage = (e: WebViewMessageEvent) => {
-    // Page -> engine, only from the server's own pages.
-    if (originOf(e.nativeEvent.url) === origin && isEngineMessage(e.nativeEvent.data)) TabshareAudio.send(e.nativeEvent.data);
+    // Page -> engine (or app), only from the server's own pages.
+    if (originOf(e.nativeEvent.url) !== origin) return;
+    const data = e.nativeEvent.data;
+    if (isEngineMessage(data)) return TabshareAudio.send(data);
+    const auth = authOpenUrl(data);
+    // TONE3000 sign-in: WKWebView can't do the popup, so use the system sheet; t3k-callback.html redirects to our scheme.
+    if (auth)
+      WebBrowser.openAuthSessionAsync(auth, AUTH_CALLBACK)
+        .then((r) => toPage({ type: 'authResult', url: r.type === 'success' ? r.url : null }))
+        .catch(() => toPage({ type: 'authResult', url: null }));
   };
 
   return (
-    <SafeAreaView style={styles.screen} edges={['top', 'left', 'right']}>
+    // Edge to edge: the page keeps clear of the status bar itself (viewport-fit=cover + env(safe-area-inset-*)).
+    <View style={styles.screen}>
       <StatusBar style="light" />
       <WebView
         ref={web}
         source={{ uri: origin }}
         style={styles.screen}
+        contentInsetAdjustmentBehavior="never"
         injectedJavaScriptBeforeContentLoaded={bridgeScript(origin)}
         injectedJavaScriptBeforeContentLoadedForMainFrameOnly
         onMessage={onMessage}
@@ -126,7 +151,7 @@ export default function App() {
         onError={(e) => setLoadError(`Couldn’t reach ${origin} (${e.nativeEvent.description}).`)}
         webviewDebuggingEnabled={__DEV__}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 

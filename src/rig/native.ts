@@ -20,7 +20,9 @@ export type NativeToEngine =
   | { type: 'vstChain'; chain: { slot: number; post: boolean }[] }
   | { type: 'vstEditor'; slot: number }
   | { type: 'vstSaveAll' }
-  | { type: 'tap'; on: boolean };
+  | { type: 'tap'; on: boolean }
+  /** iOS app: run an OAuth flow in the system sign-in sheet (handled by the app, not the engine). */
+  | { type: 'authOpen'; url: string };
 
 /** A VST3 plugin in the rig chain (desktop app only). Saved in localStorage with its state. */
 export interface VstEntry {
@@ -49,7 +51,9 @@ export type NativeFromEngine =
   | { type: 'vstError'; slot: number; message: string }
   | { type: 'vstState'; slot: number; state: string }
   /** Dry input for the tuner (engine 0.2.2+). */
-  | { type: 'tap'; samples: Float32Array; sampleRate: number };
+  | { type: 'tap'; samples: Float32Array; sampleRate: number }
+  /** iOS app: where the sign-in sheet ended up (the callback URL), or null if canceled. */
+  | { type: 'authResult'; url: string | null };
 
 interface NativeBridge {
   platform: string;

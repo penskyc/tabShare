@@ -1,4 +1,6 @@
 // TONE3000 "Select" flow (OAuth 2 + PKCE, popup). Docs: https://www.tone3000.com/api, https://github.com/tone-3000/api
+import { native } from './native';
+
 const T3K = 'https://www.tone3000.com';
 const TOKENS_KEY = 'tabshare.t3k.tokens';
 
@@ -77,33 +79,14 @@ async function api<T>(clientId: string, path: string): Promise<T> {
   return (res.headers.get('content-type') ?? '').includes('json') ? res.json() : (res.text() as Promise<T>);
 }
 
-/**
- * Opens the TONE3000 catalog in a popup; resolves with the picked tone id once the user selects a tone
- * (signing in along the way if needed). Rejects if the popup is blocked, closed or fails.
- */
-export async function selectTone(clientId: string): Promise<number> {
-  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
-  const state = b64url(crypto.getRandomValues(new Uint8Array(16)));
-  const url = new URL(`${T3K}/api/v1/oauth/authorize`);
-  for (const [k, v] of Object.entries({
-    client_id: clientId,
-    redirect_uri: redirectUri(),
-    response_type: 'code',
-    code_challenge: await sha256(verifier),
-    code_challenge_method: 'S256',
-    state,
-    prompt: 'select_tone',
-    format: 'nam',
-    architecture: '2',
-    preview: 'true',
-    menubar: 'true',
-  })) {
-    url.searchParams.set(k, v);
-  }
+type CallbackParams = Record<string, string | null>;
+
+const inIosApp = () => native?.platform === 'ios';
+
+function viaPopup(url: URL) {
   const popup = window.open(url, 't3k', 'width=1100,height=800');
   if (!popup) throw new Error('Popup blocked: allow popups for this site to browse TONE3000.');
-
-  const params = await new Promise<Record<string, string | null>>((resolve, reject) => {
+  return new Promise<CallbackParams>((resolve, reject) => {
     const onMessage = (e: MessageEvent) => {
       if (e.origin !== location.origin || e.data?.type !== 't3k-callback') return;
       cleanup();
@@ -121,6 +104,47 @@ export async function selectTone(clientId: string): Promise<number> {
     };
     window.addEventListener('message', onMessage);
   });
+}
+
+/** iOS app: WKWebView has no popups, so the app runs the flow in Apple's sign-in sheet and returns the callback URL. */
+function viaApp(url: URL) {
+  return new Promise<CallbackParams>((resolve, reject) => {
+    const off = native!.onMessage((m) => {
+      if (m.type !== 'authResult') return;
+      off();
+      if (!m.url) return reject(new Error('canceled'));
+      const q = new URL(m.url).searchParams;
+      resolve(Object.fromEntries(['code', 'state', 'tone_id', 'error'].map((k) => [k, q.get(k)])));
+    });
+    native!.send({ type: 'authOpen', url: url.href });
+  });
+}
+
+/**
+ * Opens the TONE3000 catalog in a popup (a sign-in sheet in the iOS app); resolves with the picked tone id once the user selects a tone
+ * (signing in along the way if needed). Rejects if the popup is blocked, closed or fails.
+ */
+export async function selectTone(clientId: string): Promise<number> {
+  const verifier = b64url(crypto.getRandomValues(new Uint8Array(32)));
+  // The "app." prefix tells t3k-callback.html to hand the result to the iOS app's sign-in sheet (no opener there).
+  const state = (inIosApp() ? 'app.' : '') + b64url(crypto.getRandomValues(new Uint8Array(16)));
+  const url = new URL(`${T3K}/api/v1/oauth/authorize`);
+  for (const [k, v] of Object.entries({
+    client_id: clientId,
+    redirect_uri: redirectUri(),
+    response_type: 'code',
+    code_challenge: await sha256(verifier),
+    code_challenge_method: 'S256',
+    state,
+    prompt: 'select_tone',
+    format: 'nam',
+    architecture: '2',
+    preview: 'true',
+    menubar: 'true',
+  })) {
+    url.searchParams.set(k, v);
+  }
+  const params = inIosApp() ? await viaApp(url) : await viaPopup(url);
 
   if (params.state !== state) throw new Error('TONE3000 sign-in failed (state mismatch).');
   if (params.error) throw new Error(`TONE3000: ${params.error}`);
