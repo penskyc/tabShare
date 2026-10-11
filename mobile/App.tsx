@@ -144,7 +144,9 @@ export default function App() {
         applicationNameForUserAgent="tabShareMobile/0.1.0"
         // Chat links and other sites open in Safari; the app stays on its server.
         onShouldStartLoadWithRequest={(req) => {
-          if (originOf(req.url) === origin || req.url.startsWith('about:') || req.url.startsWith('blob:') || req.url.startsWith('data:')) return true;
+          if (originOf(req.url) === origin) return true;
+          // window.open() lands here as a top-frame load (no new windows); never let it replace the room with a blank page.
+          if (/^(about|blob|data):/.test(req.url)) return !req.isTopFrame;
           Linking.openURL(req.url);
           return false;
         }}

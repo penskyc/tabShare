@@ -96,6 +96,7 @@ export function Room({ session, profile, onLeave }: Props) {
   // Phones and portrait tablets: the side panel is a drawer behind a menu button, so the score gets the whole screen.
   const narrow = useNarrow();
   const [drawer, setDrawer] = useState(false);
+  const drawerSwipe = useSwipeToClose(narrow && drawer, () => setDrawer(false));
   useEffect(() => {
     if (!drawer) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
@@ -668,7 +669,7 @@ export function Room({ session, profile, onLeave }: Props) {
       </header>
 
       {narrow && drawer && <div className="drawer-veil" onClick={() => setDrawer(false)} />}
-      <aside className={`side ${sideOpen || narrow ? '' : 'collapsed'} ${drawer ? 'drawer-open' : ''}`}>
+      <aside className={`side ${sideOpen || narrow ? '' : 'collapsed'} ${drawer ? 'drawer-open' : ''}`} {...drawerSwipe}>
         {!sideOpen && !narrow ? (
           <nav className="side-rail">
             <button onClick={() => toggleSide(true)} title="Expand panel">
@@ -1066,6 +1067,42 @@ function TexDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (name
 }
 
 export type { Peer };
+
+/** Drawer: follows a leftward swipe and closes past a third of its width (or 80 px). Sliders and fields keep their touches. */
+function useSwipeToClose(active: boolean, close: () => void) {
+  const ref = useRef<HTMLElement>(null);
+  const swipe = useRef<{ x: number; y: number; dx: number; horizontal: boolean | null } | null>(null);
+  const end = () => {
+    const s = swipe.current;
+    const el = ref.current;
+    swipe.current = null;
+    if (!s || !el) return;
+    el.style.transition = el.style.transform = '';
+    if (s.horizontal && s.dx < -Math.min(80, el.offsetWidth / 3)) close();
+  };
+  return {
+    ref,
+    onTouchStart: (e: React.TouchEvent) => {
+      if (!active || (e.target as Element).closest('input, select, textarea')) return;
+      swipe.current = { x: e.touches[0].clientX, y: e.touches[0].clientY, dx: 0, horizontal: null };
+    },
+    onTouchMove: (e: React.TouchEvent) => {
+      const s = swipe.current;
+      const el = ref.current;
+      if (!s || !el) return;
+      const dx = e.touches[0].clientX - s.x;
+      const dy = e.touches[0].clientY - s.y;
+      // Decide once, after a few px: vertical drags stay scrolls of the panel.
+      if (s.horizontal === null && Math.abs(dx) + Math.abs(dy) > 8) s.horizontal = Math.abs(dx) > Math.abs(dy);
+      if (!s.horizontal) return;
+      s.dx = Math.min(0, dx);
+      el.style.transition = 'none';
+      el.style.transform = `translateX(${s.dx}px)`;
+    },
+    onTouchEnd: end,
+    onTouchCancel: end,
+  };
+}
 
 /** True on small screens and touch-only devices like iPads (same query as the CSS drawer layout). */
 function useNarrow() {
