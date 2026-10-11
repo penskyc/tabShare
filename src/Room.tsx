@@ -93,6 +93,15 @@ export function Room({ session, profile, onLeave }: Props) {
     setSideOpen(open);
     writePref('sideOpen', open ? '1' : '0');
   };
+  // Phones and portrait tablets: the side panel is a drawer behind a menu button, so the score gets the whole screen.
+  const narrow = useNarrow();
+  const [drawer, setDrawer] = useState(false);
+  useEffect(() => {
+    if (!drawer) return;
+    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setDrawer(false);
+    addEventListener('keydown', onKey);
+    return () => removeEventListener('keydown', onKey);
+  }, [drawer]);
   const startResize = (e: React.PointerEvent<HTMLDivElement>) => {
     const handle = e.currentTarget;
     const left = handle.parentElement!.getBoundingClientRect().left;
@@ -629,13 +638,16 @@ export function Room({ session, profile, onLeave }: Props) {
   return (
     <div className="room" style={{ ['--side-w' as string]: sideOpen ? `${sideW}px` : '44px' }}>
       <header className="room-head">
+        <button className="btn ghost menu-btn" onClick={() => setDrawer(!drawer)} aria-label="Menu" aria-expanded={drawer}>
+          ☰
+        </button>
         <div className="brand-sm">
           tab<span>Share</span>
         </div>
         <div className="room-title">
           <h1>{room.roomName}</h1>
           <button className="code-chip" onClick={copyInvite} title="Copy invite link">
-            #{session.roomId} ⧉
+            <span className="hide-narrow">#{session.roomId} </span>⧉
           </button>
           {room.status !== 'open' && <span className="conn-warn">{room.status}…</span>}
         </div>
@@ -647,7 +659,7 @@ export function Room({ session, profile, onLeave }: Props) {
         </div>
         {!call.inCall && (
           <button className="btn" onClick={call.join} title="Join the video/voice call">
-            📹 {call.peersInCall.length ? `Join call (${call.peersInCall.length})` : 'Start call'}
+            📹 <span className="hide-narrow">{call.peersInCall.length ? `Join call (${call.peersInCall.length})` : 'Start call'}</span>
           </button>
         )}
         <button className="btn ghost" onClick={onLeave}>
@@ -655,8 +667,9 @@ export function Room({ session, profile, onLeave }: Props) {
         </button>
       </header>
 
-      <aside className={`side ${sideOpen ? '' : 'collapsed'}`}>
-        {!sideOpen ? (
+      {narrow && drawer && <div className="drawer-veil" onClick={() => setDrawer(false)} />}
+      <aside className={`side ${sideOpen || narrow ? '' : 'collapsed'} ${drawer ? 'drawer-open' : ''}`}>
+        {!sideOpen && !narrow ? (
           <nav className="side-rail">
             <button onClick={() => toggleSide(true)} title="Expand panel">
               »
@@ -690,8 +703,8 @@ export function Room({ session, profile, onLeave }: Props) {
               {p === 'tabs' ? 'Library' : p === 'tracks' ? 'Tracks' : p === 'rig' ? (rig.on ? 'Rig ●' : 'Rig') : `Chat${room.chat.length ? ` · ${room.chat.length}` : ''}`}
             </button>
           ))}
-          <button className="side-collapse" onClick={() => toggleSide(false)} title="Collapse panel">
-            «
+          <button className="side-collapse" onClick={() => (narrow ? setDrawer(false) : toggleSide(false))} title={narrow ? 'Close' : 'Collapse panel'}>
+            {narrow ? '✕' : '«'}
           </button>
         </nav>
 
@@ -727,7 +740,13 @@ export function Room({ session, profile, onLeave }: Props) {
               {room.tabs.length === 0 && <li className="muted small">Library is empty. Search Songsterr above, or add a Guitar Pro file.</li>}
               {room.tabs.map((t) => (
                 <li key={t.id} className={t.id === room.currentTabId ? 'active' : ''}>
-                  <button className="tab-item" onClick={() => room.setTab(t.id)}>
+                  <button
+                    className="tab-item"
+                    onClick={() => {
+                      room.setTab(t.id);
+                      setDrawer(false);
+                    }}
+                  >
                     <strong>{t.title || t.fileName}</strong>
                     <span className="muted small">
                       {t.artist ? `${t.artist} · ` : ''}.{t.ext} · by {t.uploadedBy}
@@ -1047,3 +1066,16 @@ function TexDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit: (name
 }
 
 export type { Peer };
+
+/** True on phones and portrait tablets (same breakpoint as the CSS drawer layout). */
+function useNarrow() {
+  const query = '(max-width: 860px)';
+  const [narrow, setNarrow] = useState(() => matchMedia(query).matches);
+  useEffect(() => {
+    const mq = matchMedia(query);
+    const on = () => setNarrow(mq.matches);
+    mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  return narrow;
+}
