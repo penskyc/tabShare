@@ -120,6 +120,12 @@ export function Room({ session, profile, onLeave }: Props) {
   const [texOpen, setTexOpen] = useState(false);
   // Per-person tools, remembered on this device.
   const [showTuner, setShowTuner] = useState(false);
+  // iOS (Safari + the app): Web Audio follows the silent switch unless the page asks for a playback session, like a
+  // music app. Mic/interface capture (call, rig, tuner) needs play-and-record instead.
+  useEffect(() => {
+    const session = (navigator as { audioSession?: { type: string } }).audioSession;
+    if (session) session.type = call.inCall || rig.on || showTuner ? 'play-and-record' : 'playback';
+  }, [call.inCall, rig.on, showTuner]);
   const [showFretboard, setShowFretboard] = useState(() => readPref('fretboard.open') === '1');
   const [zoom, setZoom] = useState(() => Number(readPref('zoom')) || 1);
   const toggleFretboard = () => {
