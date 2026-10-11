@@ -96,7 +96,10 @@ Local `.env` (gitignored): `ADMIN_PASSWORD=devadmin`, `TONE3000_CLIENT_ID=t3k_pu
 - Server: pushing to `main` builds `ghcr.io/penskyc/tabshare:latest` (GitHub Actions).
 - Desktop: bump `desktop/package.json` `version`, then on each OS `npm run build:native`, `npm test`, `npm run dist`,
   smoke-test the package (`node smoke.mjs <app>` against `npm run dev`), and publish with `npm run publish` (Windows) /
-  `npm run publish:mac` (macOS, signs + notarizes) to the GitHub release (needs `GH_TOKEN`). Apps update from GitHub.
+  `npm run publish:mac` (macOS, signs + notarizes): electron-builder builds, then `release.mjs` checks the installer's
+  sha512 against `latest*.yml`, creates release `vX.Y.Z` if needed and uploads with `gh` (signed in). Don't use
+  electron-builder's own `--publish`: it raced itself and uploaded an installer that didn't match `latest.yml`, which
+  the updater rejects. Apps update from GitHub.
 - After pulling, run `npm install` in `desktop/` before building: a build missing a new dependency packages fine but
   crashes at launch.
 

@@ -11,9 +11,9 @@
     "start": "electron .",
     "test": "node --test *.test.mjs native/vst.test.mjs",
     "dist": "electron-builder",
-    "publish": "electron-builder --win --publish always",
+    "publish": "electron-builder --win && node release.mjs",
     "build:native": "cmake-js build -d native -O native/build --runtime=electron --runtime-version=44.7.0 --CDCMAKE_BUILD_TYPE=Release",
-    "publish:mac": "APPLE_KEYCHAIN_PROFILE=tabshare electron-builder --mac --publish always",
+    "publish:mac": "APPLE_KEYCHAIN_PROFILE=tabshare electron-builder --mac && node release.mjs",
     "dist:mac": "APPLE_KEYCHAIN_PROFILE=tabshare electron-builder --mac"
   },
   "build": {
