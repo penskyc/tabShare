@@ -109,7 +109,14 @@ export function RigPanel({ rig, inCall }: { rig: RigControls; inCall: boolean })
           {desktopDownload && (
             <>
               {' '}
-              For much lower latency, <a href={desktopDownload.url}>{desktopDownload.label}</a>.
+              For much lower latency,{' '}
+              {desktopDownload.map((d, i) => (
+                <span key={d.url}>
+                  {i > 0 && ' or '}
+                  <a href={d.url}>{d.label}</a>
+                </span>
+              ))}
+              .
             </>
           )}
         </p>

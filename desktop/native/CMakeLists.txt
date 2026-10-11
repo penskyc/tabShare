@@ -3,6 +3,11 @@
 # Windows: tabshare_vst.node hosts the plugins in process (JUCE).
 # macOS:   tabshare_vst.node is a JUCE-free client; the plugins run in tabshare_plugin_host (see vst.cpp, host.cpp).
 cmake_minimum_required(VERSION 3.22)
+# macOS: universal (Apple Silicon + Intel), so both Mac apps ship the same binaries. FORCE beats the single arch cmake-js
+# passes; set here rather than on the command line because npm runs scripts in cmd.exe on Windows, which splits on ';'.
+if(APPLE)
+  set(CMAKE_OSX_ARCHITECTURES "arm64;x86_64" CACHE STRING "" FORCE)
+endif()
 project(tabshare_vst VERSION 0.1.0 LANGUAGES C CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_MSVC_RUNTIME_LIBRARY "MultiThreaded$<$<CONFIG:Debug>:Debug>")

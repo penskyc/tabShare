@@ -11,19 +11,21 @@ const tag = `v${version}`;
 const mac = process.platform === 'darwin';
 // Named by OS + architecture (no version), so .../releases/latest/download/<name> links never change.
 const WIN_EXE = 'tabShare-Windows-x64-Setup.exe';
-const MAC_DMG = 'tabShare-macOS-arm64.dmg';
+const MAC_ARCHS = ['arm64', 'x64'];
 const feed = mac ? 'latest-mac.yml' : 'latest.yml';
 const files = mac
-  ? [`${MAC_DMG}`, `tabShare-${version}-macOS-arm64.zip`, `tabShare-${version}-macOS-arm64.zip.blockmap`, feed]
+  ? [...MAC_ARCHS.flatMap((a) => [`tabShare-macOS-${a}.dmg`, `tabShare-${version}-macOS-${a}.zip`, `tabShare-${version}-macOS-${a}.zip.blockmap`]), feed]
   : [WIN_EXE, `${WIN_EXE}.blockmap`, feed];
 
 for (const f of files) if (!existsSync(`dist/${f}`)) throw new Error(`missing dist/${f}: build first`);
 // The updater refuses a download whose sha512 doesn't match the feed, so check before anything goes public.
 const yml = readFileSync(`dist/${feed}`, 'utf8');
 if (!yml.includes(`version: ${version}`)) throw new Error(`dist/${feed} is not for ${version}`);
-const target = yml.match(/^path: (.+)$/m)[1].trim();
-const sha = createHash('sha512').update(readFileSync(`dist/${target}`)).digest('base64');
-if (sha !== yml.match(/^sha512: (.+)$/m)[1].trim()) throw new Error(`dist/${target} doesn't match its sha512 in ${feed}`);
+// Every file the feed lists (macOS lists one zip + dmg per architecture; the updater picks the one for its Mac).
+for (const [, url, sha512] of yml.matchAll(/- url: (.+)\n\s+sha512: (.+)/g)) {
+  const sha = createHash('sha512').update(readFileSync(`dist/${url.trim()}`)).digest('base64');
+  if (sha !== sha512.trim()) throw new Error(`dist/${url.trim()} doesn't match its sha512 in ${feed}`);
+}
 
 const gh = (...args) => execFileSync('gh', [...args, '--repo', `${owner}/${repo}`], { stdio: 'inherit' });
 try {

@@ -16,7 +16,7 @@ rig in the same room. Think Songsterr / Guitar Pro, multiplayer, on your own ser
   chat with link previews.
 - **Amp rig:** play guitar or bass through [Neural Amp Modeler](https://www.neuralampmodeler.com/) captures (local
   `.nam` files or browsed from TONE3000), cab IRs, and VST3 plugins (desktop app), sent straight into the call.
-- **Desktop app** (Windows, macOS Apple Silicon): the same rooms, with a native **ASIO / Core Audio** engine for
+- **Desktop app** (Windows, macOS Apple Silicon and Intel): the same rooms, with a native **ASIO / Core Audio** engine for
   low-latency monitoring (about 5–25 ms instead of the browser's 50–70 ms) and VST3 hosting. Updates itself.
 
 Rooms are private: the admin creates them, people join with a link and the room password.
@@ -101,8 +101,9 @@ Download the latest build from [Releases](https://github.com/penskyc/tabShare/re
 |---|---|
 | Windows 10/11, 64-bit (x64; also runs on Windows on ARM via emulation) | [`tabShare-Windows-x64-Setup.exe`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-Windows-x64-Setup.exe) |
 | macOS 12+, Apple Silicon (M1 and later; arm64) | [`tabShare-macOS-arm64.dmg`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-macOS-arm64.dmg) |
+| macOS 12+, Intel (x64) | [`tabShare-macOS-x64.dmg`](https://github.com/penskyc/tabShare/releases/latest/download/tabShare-macOS-x64.dmg) |
 
-Intel Macs aren't built yet. On first launch it asks for:
+On first launch it asks for:
 
 - the **server URL**,
 - an **API key** from the server's admin (Admin → API keys),
