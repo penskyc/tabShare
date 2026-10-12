@@ -283,8 +283,8 @@ app.whenReady().then(async () => {
   });
   ipcMain.on('app-origin', (e) => (e.returnValue = APP_ORIGIN));
   const browserSession = session.fromPartition(BROWSER_PARTITION);
-  // Plain Chrome to the sites you browse: no Electron/app tokens (anti-bot checks flag them, and it's nobody's business).
-  browserSession.setUserAgent(app.userAgentFallback.replace(/ (Electron|tabShare[\w-]*)\/\S+/gi, ''));
+  // Keep the app's own user agent here. A "plain Chrome" one fails Cloudflare Turnstile (Reverb sign-in): it doesn't
+  // match the client hints, and the challenge's own requests still go out with the process-wide UA.
   browserSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'fullscreen' || perm === 'clipboard-sanitized-write'));
   browserSession.setPermissionCheckHandler((_wc, perm) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write');
   // Inside an embedded page: links that open new windows load in place; non-web links (mailto:) go to the OS.
