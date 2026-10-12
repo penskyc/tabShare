@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import * as alphaTab from '@coderline/alphatab';
-import { BASS_TUNINGS, MAX_FRET, place, toAlphaTex, type Built } from './exercises.js';
+import { allParams, BASS_TUNINGS, defaults, MAX_FRET, place, sanitize, toAlphaTex, tuningOf, type Built, type Exercise } from './exercises.js';
 
 const FOUR = BASS_TUNINGS['4-string'];
 const FIVE = BASS_TUNINGS['5-string'];
@@ -69,4 +69,33 @@ test('toAlphaTex writes tuning, tempo, dead notes, dots and rests that alphaTab 
     ],
   );
   assert.equal(st.bars[1].voices[0].beats[0].dots, 1);
+});
+
+const DUMMY: Exercise = {
+  id: 'X',
+  category: 'Warm-up',
+  name: 'Dummy',
+  description: '',
+  tips: [],
+  kind: 'tab',
+  params: [
+    { id: 'key', label: 'Key', kind: 'key', default: 4 },
+    { id: 'scale', label: 'Scale', kind: 'choice', options: ['A', 'B'], default: 'A' },
+    { id: 'fret', label: 'Fret', kind: 'number', min: 1, max: 9, default: 1 },
+  ],
+  build: () => ({ bars: [], fretboard: { root: 0, set: [] }, allowed: [] }),
+};
+
+test('playable exercises also get bass and tempo settings', () => {
+  assert.deepEqual(allParams(DUMMY).map((p) => p.id), ['key', 'scale', 'fret', 'tuning', 'tempo']);
+  assert.deepEqual(allParams({ ...DUMMY, kind: 'fretboard' }).map((p) => p.id), ['key', 'scale', 'fret']);
+  assert.deepEqual(defaults(DUMMY), { key: 4, scale: 'A', fret: 1, tuning: '4-string', tempo: 80 });
+});
+
+test('sanitize keeps valid saved settings and drops stale ones', () => {
+  assert.deepEqual(sanitize(DUMMY, { key: 7, scale: 'B', fret: 5, tuning: '5-string', tempo: 120 }), { key: 7, scale: 'B', fret: 5, tuning: '5-string', tempo: 120 });
+  assert.deepEqual(sanitize(DUMMY, { key: 12, scale: 'Gone', fret: 99, tuning: '7-string', tempo: 'fast' }), defaults(DUMMY));
+  assert.deepEqual(sanitize(DUMMY, null), defaults(DUMMY));
+  assert.deepEqual(tuningOf({ tuning: '5-string' }), FIVE);
+  assert.deepEqual(tuningOf({ tuning: 'nope' }), FOUR);
 });

@@ -43,6 +43,27 @@ export interface Exercise {
 export const MAX_FRET = 15;
 export const BASS_TUNINGS: Record<string, number[]> = { '4-string': TUNINGS.bass[0].notes, '5-string': TUNINGS.bass[4].notes };
 
+const TUNING_PARAM: ParamSpec = { id: 'tuning', label: 'Bass', kind: 'choice', options: Object.keys(BASS_TUNINGS), default: '4-string' };
+const TEMPO_PARAM: ParamSpec = { id: 'tempo', label: 'Tempo', kind: 'number', min: 40, max: 200, step: 1, default: 80 };
+
+/** Every setting an exercise shows: its own, plus bass and tempo for playable ones. */
+export const allParams = (ex: Exercise): ParamSpec[] => (ex.kind === 'tab' ? [...ex.params, TUNING_PARAM, TEMPO_PARAM] : ex.params);
+export const tuningOf = (o: Opts) => BASS_TUNINGS[String(o.tuning)] ?? BASS_TUNINGS['4-string'];
+export const defaults = (ex: Exercise): Opts => Object.fromEntries(allParams(ex).map((p) => [p.id, p.default]));
+
+/** Saved settings from an older version (renamed options, out-of-range numbers) fall back to the defaults. */
+export function sanitize(ex: Exercise, saved: unknown): Opts {
+  const s = (saved && typeof saved === 'object' ? saved : {}) as Record<string, unknown>;
+  const o = defaults(ex);
+  for (const p of allParams(ex)) {
+    const v = s[p.id];
+    if (p.kind === 'choice' && typeof v === 'string' && p.options.includes(v)) o[p.id] = v;
+    if (p.kind === 'key' && typeof v === 'number' && Number.isInteger(v) && v >= 0 && v < 12) o[p.id] = v;
+    if (p.kind === 'number' && typeof v === 'number' && v >= p.min && v <= p.max) o[p.id] = v;
+  }
+  return o;
+}
+
 export const pc = (m: number) => ((m % 12) + 12) % 12;
 
 /** One beat before placement: a pitch (null = rest), or a fixed string/fret for shape drills. */
