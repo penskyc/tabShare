@@ -1,5 +1,5 @@
 // Which sound bank the synth uses. Phones, tablets and the iOS app always use the small built-in one; web and desktop
-// pick per person (default GeneralUser GS). The full banks come from scripts/fetch-soundfonts.mjs.
+// pick per person (default MuseScore General). The full banks come from scripts/fetch-soundfonts.mjs.
 import { useSyncExternalStore } from 'react';
 
 export const SOUND_BANKS = [
@@ -10,7 +10,7 @@ export const SOUND_BANKS = [
 export type SoundBankId = (typeof SOUND_BANKS)[number]['id'];
 
 const KEY = 'tabshare.soundBank';
-const DEFAULT_FULL: SoundBankId = 'generaluser';
+const DEFAULT_FULL: SoundBankId = 'musescore';
 
 /** Touch-only devices (phones, iPads) and the iOS app: keep the 1.3 MB bank (download size, memory). */
 export const lightOnly = () =>
