@@ -27,8 +27,11 @@ export function step(api: alphaTab.AlphaTabApi, { by, dir }: Step): boolean {
   let i = bars.findIndex((b) => t >= b.start && t < b.end);
   if (i < 0) i = t >= bars[bars.length - 1].end ? bars.length - 1 : 0;
   let start: number;
+  let barIndex: number;
   if (by === 'bar') {
-    start = bars[Math.min(bars.length - 1, Math.max(0, i + dir))].start;
+    const target = bars[Math.min(bars.length - 1, Math.max(0, i + dir))];
+    start = target.start;
+    barIndex = target.masterBar.index;
   } else {
     const rows = api.renderer.boundsLookup?.staffSystems ?? [];
     const row = rows.findIndex((s) => s.bars.some((b) => b.index === bars[i].masterBar.index));
@@ -40,8 +43,24 @@ export function step(api: alphaTab.AlphaTabApi, { by, dir }: Step): boolean {
     const pick = dir > 0 ? (hits.find((b) => b.start > t) ?? hits[0]) : ([...hits].reverse().find((b) => b.start < t) ?? hits[hits.length - 1]);
     if (!pick) return false;
     start = pick.start;
+    barIndex = first;
   }
   api.tickPosition = start;
-  api.scrollToCursor();
+  revealRow(api, barIndex);
   return true;
+}
+
+/**
+ * Scrolls the row holding `barIndex` into view (only if it isn't already). Not api.scrollToCursor(): alphaTab moves its
+ * cursor a moment after tickPosition is set, so that scrolled to the old row and moving up left the new one hidden.
+ */
+function revealRow(api: alphaTab.AlphaTabApi, barIndex: number) {
+  const row = api.renderer.boundsLookup?.staffSystems.find((s) => s.bars.some((b) => b.index === barIndex))?.visualBounds;
+  const scroller = api.settings.player.scrollElement;
+  const host = (api.container as unknown as { element?: HTMLElement }).element;
+  if (!row || !host || !(scroller instanceof HTMLElement)) return;
+  const margin = 24;
+  const top = host.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop + row.y;
+  if (top >= scroller.scrollTop + margin && top + row.h <= scroller.scrollTop + scroller.clientHeight - margin) return;
+  scroller.scrollTo({ top: Math.max(0, top - 2 * margin), behavior: 'smooth' });
 }
