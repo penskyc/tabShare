@@ -496,3 +496,4 @@ body.call-window > div { height: 100%; }
 .practice-spacer { flex: 1; }
 .practice-transport { grid-area: auto; }
 .practice-small { width: 52px; }
+.practice-bar select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color: var(--text); font-size: 13px; }
