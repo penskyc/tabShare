@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type * as alphaTab from '@coderline/alphatab';
 import { ScoreView } from './ScoreView';
 import { Fretboard } from './Fretboard';
+import { arrowStep, step } from './barNav';
 import { allParams, CATEGORIES, EXERCISES, sanitize, toAlphaTex, tuningOf, type Built, type Opts, type ParamSpec } from '../shared/exercises';
 import { ROOTS } from '../shared/music';
 
@@ -163,6 +164,8 @@ export function Practice({ tunerOn, onToggleTuner }: { tunerOn: boolean; onToggl
     api.playbackSpeed = 1;
     setLiveTempo(null);
   };
+  const apiRef = useRef(api);
+  apiRef.current = api;
   const playRef = useRef(playPause);
   playRef.current = playPause;
   useEffect(() => {
@@ -172,6 +175,11 @@ export function Practice({ tunerOn, onToggleTuner }: { tunerOn: boolean; onToggl
       if (e.code === 'Space') {
         e.preventDefault();
         playRef.current();
+      }
+      const arrow = arrowStep(e);
+      if (arrow && apiRef.current) {
+        e.preventDefault();
+        step(apiRef.current, arrow);
       }
     };
     window.addEventListener('keydown', onKey);

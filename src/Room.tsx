@@ -16,6 +16,7 @@ import { setAudioSession } from './audioSession';
 import { Fretboard } from './Fretboard';
 import { Practice } from './Practice';
 import { Browser } from './Browser';
+import { arrowStep, step } from './barNav';
 import { lightOnly, setSoundBank, SOUND_BANKS, useSoundBank, type SoundBankId } from './soundfont';
 import { setScoreDark, useScoreDark } from './scoreTheme';
 import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from './OriginalAudio';
@@ -489,10 +490,17 @@ export function Room({ session, profile, onLeave }: Props) {
     api.masterVolume = mode === 'practice' ? 0 : 1;
   }, [api, mode]);
 
-  // Space = play/pause (unless typing; Practice has its own).
+  // Space = play/pause; arrows = previous/next bar (← →) and row (↑ ↓). Not while typing; Practice has its own.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (mode === 'practice') return;
+      const arrow = mode === 'tab' ? arrowStep(e) : null;
+      if (arrow && api && ready) {
+        e.preventDefault();
+        userSeekAt.current = performance.now(); // a user-caused seek: jam sync shares it, like clicking a beat
+        step(api, arrow);
+        return;
+      }
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.code === 'Space') {
@@ -502,7 +510,7 @@ export function Room({ session, profile, onLeave }: Props) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [playPause, mode]);
+  }, [playPause, mode, api, ready]);
 
   // ---------- tracks: view, mute, solo (shared with jam users via room.mix) ----------
   useEffect(() => {
