@@ -84,7 +84,8 @@ export function Fretboard({ api, score, forced }: { api: alphaTab.AlphaTabApi | 
     };
     api.playerPositionChanged.on(handler);
     return () => api.playerPositionChanged.off(handler);
-  }, [api, following, p.follow]);
+    // score: a new tab/exercise on the same api must drop the lookup hint, or findBeat searches from an old score's beat.
+  }, [api, score, following, p.follow]);
 
   const scale = forced ? forced.set : (SCALES[p.scale] ?? []);
   const arp = forced ? [] : (ARPEGGIOS[p.arp] ?? []);
