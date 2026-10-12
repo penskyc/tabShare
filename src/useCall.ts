@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CallState, Peer } from '../shared/protocol';
 import type { RoomConnection } from './useRoom';
-import { getAudioContext } from './rig/audioContext';
+import { CallAudio, DEFAULT_LEVELS, loadMix, mixKey, saveMix, type MixLevels, type MixPart } from './callAudio';
 
 // shortcut: STUN only — peers behind strict/symmetric NAT can't connect; add a TURN server (e.g. coturn) to ICE_SERVERS if that happens.
 const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
@@ -38,8 +38,8 @@ export const callSupported = () => window.isSecureContext && !!navigator.mediaDe
 
 /**
  * Mesh WebRTC call over the room WebSocket. The peer with the lower clientId always offers, so there's
- * no glare; each connection has exactly one audio + one video transceiver, and every media change
- * (mute, camera, device switch, screen share) is a replaceTrack — no renegotiation.
+ * no glare; each connection has three transceivers in a fixed order — voice, instrument, video — and every media
+ * change (mute, camera, device switch, screen share, rig on/off) is a replaceTrack — no renegotiation.
  */
 export function useCall(room: RoomConnection, instrumentStream: MediaStream | null = null, voiceStream: MediaStream | null = null) {
   const [inCall, setInCall] = useState(false);
@@ -52,41 +52,30 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
   const [speakerId, setSpeakerId] = useState(pref('speakerId'));
   const [devices, setDevices] = useState<Devices>({ mics: [], cams: [], speakers: [] });
   const [localStream, setLocalStream] = useState<MediaStream | null>(null);
-  const [remoteStreams, setRemoteStreams] = useState<Record<string, MediaStream>>({});
+  // Per peer: voice + video (tiles, speaking ring) and the instrument (only played, through the mix).
+  const [remote, setRemote] = useState<Record<string, { stream: MediaStream; voice: MediaStreamTrack | null; instrument: MediaStreamTrack | null }>>({});
+  const [mix, setMix] = useState(loadMix);
+  const callAudio = useRef<CallAudio | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [reconnectTick, setReconnectTick] = useState(0);
 
   const conns = useRef(new Map<string, Conn>());
   const micTrack = useRef<MediaStreamTrack | null>(null);
-  // Outgoing audio is a mix (mic + instrument rig) so mute only silences the voice and the guitar
-  // stays clean (no voice processing). The mixed track stays the same object for the whole call.
-  const mixer = useRef<{ dest: MediaStreamAudioDestinationNode; mic: MediaStreamAudioSourceNode | null; instrument: MediaStreamAudioSourceNode | null } | null>(null);
-  const outAudio = () => mixer.current?.dest.stream.getAudioTracks()[0] ?? null;
-  const connectMic = () => {
-    const m = mixer.current;
-    if (!m) return;
-    m.mic?.disconnect();
-    m.mic = micTrack.current ? getAudioContext().createMediaStreamSource(new MediaStream([micTrack.current])) : null;
-    m.mic?.connect(m.dest);
-  };
+  // Voice and instrument go out as separate tracks (receivers set their volumes independently; mute only disables the
+  // voice, and the instrument skips voice processing).
   const instrumentRef = useRef(instrumentStream);
   instrumentRef.current = instrumentStream;
+  /** What a transceiver sends: by kind, and for audio by position (first = voice, second = instrument). */
+  const outTrack = (pc: RTCPeerConnection, t: RTCRtpTransceiver) => {
+    if (t.receiver.track.kind === 'video') return screenTrack.current ?? camTrack.current;
+    const audio = pc.getTransceivers().filter((x) => x.receiver.track.kind === 'audio');
+    return audio.indexOf(t) === 1 ? (instrumentRef.current?.getAudioTracks()[0] ?? null) : micTrack.current;
+  };
   // iOS app with the rig on: the voice comes from the interface via the rig (iOS has one input device), so it stands in
   // for the mic, and WebKit's own mic capture is released so it doesn't fight the native engine for the hardware.
   const voiceRef = useRef(voiceStream);
   voiceRef.current = voiceStream;
   const rigVoiceTrack = () => voiceRef.current?.getAudioTracks()[0]?.clone() ?? null;
-  const connectInstrument = (stream: MediaStream | null) => {
-    const m = mixer.current;
-    if (!m) return;
-    m.instrument?.disconnect();
-    m.instrument = stream ? getAudioContext().createMediaStreamSource(stream) : null;
-    m.instrument?.connect(m.dest);
-  };
-  useEffect(() => {
-    connectInstrument(instrumentStream);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [instrumentStream]);
   const camTrack = useRef<MediaStreamTrack | null>(null);
   const screenTrack = useRef<MediaStreamTrack | null>(null);
   const roomRef = useRef(room);
@@ -111,10 +100,7 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
   const syncTracks = useCallback(() => {
     const video = screenTrack.current ?? camTrack.current;
     for (const { pc } of conns.current.values()) {
-      for (const t of pc.getTransceivers()) {
-        const kind = t.receiver.track.kind;
-        t.sender.replaceTrack(kind === 'audio' ? outAudio() : video).catch(() => {});
-      }
+      for (const t of pc.getTransceivers()) t.sender.replaceTrack(outTrack(pc, t)).catch(() => {});
     }
     setLocalStream(new MediaStream([micTrack.current, video].filter((t): t is MediaStreamTrack => !!t)));
   }, []);
@@ -142,7 +128,7 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
   const closeConn = useCallback((peerId: string) => {
     conns.current.get(peerId)?.pc.close();
     conns.current.delete(peerId);
-    setRemoteStreams((s) => {
+    setRemote((s) => {
       if (!s[peerId]) return s;
       const next = { ...s };
       delete next[peerId];
@@ -157,18 +143,23 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       conns.current.set(peerId, conn);
       pc.onicecandidate = (e) => e.candidate && roomRef.current.sendRtc(peerId, { candidate: e.candidate.toJSON() } satisfies Signal);
       pc.ontrack = () => {
-        const tracks = pc.getReceivers().map((r) => r.track);
-        setRemoteStreams((s) => ({ ...s, [peerId]: new MediaStream(tracks) }));
+        const all = pc.getTransceivers();
+        const [voice = null, instrument = null] = all.filter((t) => t.receiver.track.kind === 'audio').map((t) => t.receiver.track);
+        const video = all.find((t) => t.receiver.track.kind === 'video')?.receiver.track;
+        const stream = new MediaStream([voice, video].filter((t): t is MediaStreamTrack => !!t));
+        setRemote((s) => ({ ...s, [peerId]: { stream, voice, instrument } }));
       };
       pc.onconnectionstatechange = () => {
         if (pc.connectionState === 'connected') {
-          // Music, not just speech: give Opus more room than the ~32 kbps default.
-          const sender = pc.getTransceivers().find((t) => t.receiver.track.kind === 'audio')?.sender;
-          const params = sender?.getParameters();
-          if (sender && params?.encodings?.length) {
-            params.encodings[0].maxBitrate = 128_000;
-            sender.setParameters(params).catch(() => {});
-          }
+          // Opus defaults to ~32 kbps: more for the voice, music quality for the instrument.
+          pc.getTransceivers()
+            .filter((t) => t.receiver.track.kind === 'audio')
+            .forEach((t, i) => {
+              const params = t.sender.getParameters();
+              if (!params.encodings?.length) return;
+              params.encodings[0].maxBitrate = i === 1 ? 128_000 : 64_000;
+              t.sender.setParameters(params).catch(() => {});
+            });
         }
         if (pc.connectionState === 'failed') {
           closeConn(peerId);
@@ -177,7 +168,8 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       };
       if (initiator) {
         const video = screenTrack.current ?? camTrack.current;
-        pc.addTransceiver(outAudio() ?? 'audio', { direction: 'sendrecv' });
+        pc.addTransceiver(micTrack.current ?? 'audio', { direction: 'sendrecv' });
+        pc.addTransceiver(instrumentRef.current?.getAudioTracks()[0] ?? 'audio', { direction: 'sendrecv' });
         pc.addTransceiver(video ?? 'video', { direction: 'sendrecv' });
         pc.createOffer()
           .then((offer) => pc.setLocalDescription(offer))
@@ -210,10 +202,9 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
           closeConn(from); // a new offer always means a fresh connection from the initiator
           const conn = makeConn(from, false);
           await conn.pc.setRemoteDescription(data.sdp);
-          const video = screenTrack.current ?? camTrack.current;
           for (const t of conn.pc.getTransceivers()) {
             t.direction = 'sendrecv';
-            await t.sender.replaceTrack(t.receiver.track.kind === 'audio' ? outAudio() : video);
+            await t.sender.replaceTrack(outTrack(conn.pc, t));
           }
           await conn.pc.setLocalDescription(await conn.pc.createAnswer());
           room.sendRtc(from, { sdp: conn.pc.localDescription!.toJSON() } satisfies Signal);
@@ -256,6 +247,10 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       setError('Calls need HTTPS (or localhost). Open tabShare through its https:// address.');
       return;
     }
+    // Created inside the click, so autoplay rules let it play.
+    callAudio.current ??= new CallAudio();
+    callAudio.current.resume();
+    callAudio.current.setSink(speakerId);
     try {
       const rigVoice = rigVoiceTrack();
       const audio = rigVoice ? false : audioConstraints(micId, originalSound);
@@ -274,11 +269,6 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       });
       micTrack.current = rigVoice ?? stream.getAudioTracks()[0] ?? null;
       camTrack.current = stream.getVideoTracks()[0] ?? null;
-      const ctx = getAudioContext();
-      await ctx.resume();
-      mixer.current = { dest: ctx.createMediaStreamDestination(), mic: null, instrument: null };
-      connectMic();
-      connectInstrument(instrumentRef.current);
       const hasCam = !!camTrack.current;
       setMic(true);
       setCam(hasCam);
@@ -291,7 +281,7 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       const err = e as DOMException;
       setError(err.name === 'NotAllowedError' ? 'Microphone/camera permission was blocked. Allow it in the address bar and try again.' : err.message);
     }
-  }, [micId, camId, originalSound, audioConstraints, syncTracks, announce, refreshDevices]);
+  }, [micId, camId, speakerId, originalSound, audioConstraints, syncTracks, announce, refreshDevices]);
 
   const leave = useCallback(() => {
     for (const id of [...conns.current.keys()]) closeConn(id);
@@ -299,9 +289,8 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       t.current?.stop();
       t.current = null;
     }
-    mixer.current?.mic?.disconnect();
-    mixer.current?.instrument?.disconnect();
-    mixer.current = null;
+    callAudio.current?.close();
+    callAudio.current = null;
     setLocalStream(null);
     setInCall(false);
     setScreen(false);
@@ -378,7 +367,6 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
       micTrack.current?.stop();
       micTrack.current = s.getAudioTracks()[0];
       micTrack.current.enabled = mic;
-      connectMic();
       syncTracks();
     } catch (e) {
       setError(`Microphone unavailable: ${(e as Error).message}`);
@@ -396,10 +384,36 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
     micTrack.current?.stop();
     micTrack.current = rigVoice;
     rigVoice.enabled = mic;
-    connectMic();
     syncTracks();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [voiceStream]);
+
+  // The rig turned on or off (or restarted): send its new track.
+  useEffect(() => {
+    if (inCall) syncTracks();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [instrumentStream]);
+
+  // Play everyone through the mix; levels follow the person's name.
+  const levelsFor = useCallback((name: string): MixLevels => ({ ...DEFAULT_LEVELS, ...mix[mixKey(name)] }), [mix]);
+  const peerNames = Object.values(room.peers).map((p) => `${p.clientId}=${p.name}`).join(',');
+  useEffect(() => {
+    const audio = callAudio.current;
+    if (!audio) return;
+    for (const [id, r] of Object.entries(remote)) {
+      const levels = levelsFor(room.peers[id]?.name ?? '');
+      audio.play(id, 'voice', r.voice, levels.voice);
+      audio.play(id, 'instrument', r.instrument, levels.instrument);
+    }
+    audio.keepOnly(Object.keys(remote));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote, levelsFor, peerNames]);
+  const setLevel = (name: string, part: MixPart, value: number) =>
+    setMix((m) => {
+      const next = { ...m, [mixKey(name)]: { ...levelsFor(name), [part]: value } };
+      saveMix(next);
+      return next;
+    });
 
   const selectMic = (id: string) => {
     setMicId(id);
@@ -424,6 +438,7 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
   const selectSpeaker = (id: string) => {
     setSpeakerId(id);
     savePref('speakerId', id);
+    callAudio.current?.setSink(id);
   };
 
   const toggleOriginalSound = () => {
@@ -444,7 +459,9 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
     speakerId,
     devices,
     localStream,
-    remoteStreams,
+    remoteStreams: Object.fromEntries(Object.entries(remote).map(([id, r]) => [id, r.stream])),
+    levelsFor,
+    setLevel,
     peersInCall: peersInCall as Peer[],
     error,
     clearError: () => setError(null),

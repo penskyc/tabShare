@@ -54,27 +54,19 @@ interface TileProps {
   color: string;
   state: CallState;
   self?: boolean;
-  speakerId: string;
   pinned: boolean;
   onPin: () => void;
 }
 
-function Tile({ stream, name, color, state, self, speakerId, pinned, onPin }: TileProps) {
+function Tile({ stream, name, color, state, self, pinned, onPin }: TileProps) {
   const ref = useRef<HTMLVideoElement>(null);
-  const [volume, setVolume] = useState(1);
   const speaking = useSpeaking(stream, state.mic);
   const showVideo = state.cam || state.screen;
 
+  // Video only: call audio plays through the mix (callAudio.ts).
   useEffect(() => {
-    if (ref.current && ref.current.srcObject !== stream) ref.current.srcObject = stream;
+    if (ref.current) ref.current.srcObject = stream && new MediaStream(stream.getVideoTracks());
   }, [stream]);
-  useEffect(() => {
-    const v = ref.current as (HTMLVideoElement & { setSinkId?: (id: string) => Promise<void> }) | null;
-    if (!self && v?.setSinkId) v.setSinkId(speakerId).catch(() => {});
-  }, [speakerId, self, stream]);
-  useEffect(() => {
-    if (ref.current) ref.current.volume = volume;
-  }, [volume]);
 
   return (
     <div
@@ -83,27 +75,12 @@ function Tile({ stream, name, color, state, self, speakerId, pinned, onPin }: Ti
       onClick={onPin}
       title={pinned ? 'Click to shrink' : 'Click to enlarge'}
     >
-      {/* Remote audio plays through this element even when the video is hidden. */}
-      <video ref={ref} autoPlay playsInline muted={self} className={self && !state.screen ? 'mirror' : ''} hidden={!showVideo} />
+      <video ref={ref} autoPlay playsInline muted className={self && !state.screen ? 'mirror' : ''} hidden={!showVideo} />
       {!showVideo && <div className="tile-avatar">{name.slice(0, 1).toUpperCase()}</div>}
       <div className="tile-label">
         {!state.mic && <span title="Muted">🔇</span>} {name}
         {state.screen && <span className="muted"> · screen</span>}
       </div>
-      {!self && (
-        <input
-          className="tile-vol"
-          type="range"
-          min={0}
-          max={1}
-          step={0.05}
-          value={volume}
-          title={`Volume ${Math.round(volume * 100)}%`}
-          aria-label={`${name} volume`}
-          onClick={(e) => e.stopPropagation()}
-          onChange={(e) => setVolume(Number(e.target.value))}
-        />
-      )}
     </div>
   );
 }
@@ -112,7 +89,8 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
   const [pinned, setPinned] = useState<string | null>(null);
   const [settings, setSettings] = useState(false);
   const others = call.peersInCall;
-  const sinkSupported = 'setSinkId' in HTMLMediaElement.prototype;
+  const sinkSupported = 'setSinkId' in AudioContext.prototype;
+  const [mixOpen, setMixOpen] = useState(false);
   const [popout, setPopout] = useState(false);
   const [pip, setPip] = useState(false);
   const pipDismissed = useRef(false);
@@ -207,7 +185,7 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
     <div className="call-panel">
       <div className="tiles">
         {tiles.map((t) => (
-          <Tile key={t.id} {...t} speakerId={call.speakerId} pinned={t.id === pinned} onPin={() => setPinned(pinned === t.id ? null : t.id)} />
+          <Tile key={t.id} {...t} pinned={t.id === pinned} onPin={() => setPinned(pinned === t.id ? null : t.id)} />
         ))}
       </div>
       <div className="call-controls">
@@ -230,6 +208,11 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
         {'getDisplayMedia' in navigator.mediaDevices && (
           <button className={`call-btn ${call.screen ? 'on' : ''}`} onClick={call.toggleScreen} title="Share screen">
             🖥 <span>{call.screen ? 'Stop share' : 'Share'}</span>
+          </button>
+        )}
+        {hasOthers && (
+          <button className={`call-btn ${mixOpen ? 'on' : ''}`} onClick={() => setMixOpen(!mixOpen)} title="Each person's voice and instrument volume">
+            🎚 <span>Mix</span>
           </button>
         )}
         <div className="call-settings-wrap">
@@ -291,6 +274,36 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
           </span>
         )}
       </div>
+      {mixOpen && hasOthers && (
+        <div className="call-mix">
+          {others.map((p) => {
+            const levels = call.levelsFor(p.name);
+            return (
+              <div className="call-mix-row" key={p.clientId}>
+                <span className="call-mix-name" style={{ color: p.color }}>
+                  {p.name}
+                </span>
+                {(['voice', 'instrument'] as const).map((part) => (
+                  <label key={part} className="call-mix-level" title="Double-click for 100%">
+                    <span>{part === 'voice' ? '🎤 Voice' : '🎸 Instrument'}</span>
+                    <input
+                      type="range"
+                      min={0}
+                      max={2}
+                      step={0.05}
+                      value={levels[part]}
+                      aria-label={`${p.name} ${part} volume`}
+                      onChange={(e) => call.setLevel(p.name, part, Number(e.target.value))}
+                      onDoubleClick={() => call.setLevel(p.name, part, 1)}
+                    />
+                    <span className="call-mix-pct">{Math.round(levels[part] * 100)}%</span>
+                  </label>
+                ))}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }

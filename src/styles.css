@@ -262,8 +262,15 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 .tile video.mirror { transform: scaleX(-1); }
 .tile-avatar { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 700; color: #111; background: radial-gradient(circle, var(--c) 0 34px, var(--bg-2) 35px); }
 .tile-label { position: absolute; left: 6px; bottom: 6px; right: 6px; font-size: 12px; background: #000a; padding: 2px 7px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: fit-content; max-width: calc(100% - 12px); }
-.tile-vol { position: absolute; top: 6px; right: 6px; width: 70px; opacity: 0; transition: opacity 120ms; }
-.tile:hover .tile-vol { opacity: 1; }
+/* call mix: each person's voice and instrument */
+.call-mix { display: grid; gap: 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
+.call-mix-row { display: grid; grid-template-columns: minmax(70px, 140px) 1fr 1fr; gap: 6px 14px; align-items: center; }
+.call-mix-name { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.call-mix-level { display: flex; align-items: center; gap: 8px; font-size: 12px; color: var(--muted); }
+.call-mix-level span:first-child { flex: none; width: 100px; white-space: nowrap; }
+.call-mix-level input { flex: 1; min-width: 60px; }
+.call-mix-pct { flex: none; width: 38px; text-align: right; font-variant-numeric: tabular-nums; }
+@media (max-width: 560px) { .call-mix-row { grid-template-columns: 1fr; } }
 .call-controls { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; }
 .call-btn { display: inline-flex; align-items: center; gap: 6px; background: var(--panel); border: 1px solid var(--line); border-radius: 20px; padding: 6px 12px; font-size: 13px; }
 .call-btn.off { background: #3a1520; border-color: #5c2232; color: #ffb3bf; }
