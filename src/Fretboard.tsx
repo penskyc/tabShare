@@ -123,17 +123,17 @@ export function Fretboard({ api, score, forced }: { api: alphaTab.AlphaTabApi | 
     <div className="fretboard">
       <div className="fb-controls">
         {!forced && (
-        <label>
-          Follow
-          <select value={following ? p.follow : -1} onChange={(e) => set({ follow: Number(e.target.value) })} title="Light up the notes this track plays under the playhead">
-            <option value={-1}>Off</option>
-            {tracks.map((t) => (
-              <option key={t.index} value={t.index}>
-                {t.name || `Track ${t.index + 1}`}
-              </option>
-            ))}
-          </select>
-        </label>
+          <label>
+            Follow
+            <select value={following ? p.follow : -1} onChange={(e) => set({ follow: Number(e.target.value) })} title="Light up the notes this track plays under the playhead">
+              <option value={-1}>Off</option>
+              {tracks.map((t) => (
+                <option key={t.index} value={t.index}>
+                  {t.name || `Track ${t.index + 1}`}
+                </option>
+              ))}
+            </select>
+          </label>
         )}
         {!forced && !following && (
           <>
@@ -158,32 +158,32 @@ export function Fretboard({ api, score, forced }: { api: alphaTab.AlphaTabApi | 
         )}
         {!forced && (
           <>
-        <label>
-          Root
-          <select value={p.root} onChange={(e) => set({ root: Number(e.target.value) })}>
-            {ROOTS.map((r, i) => (
-              <option key={r} value={i}>
-                {r}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Scale
-          <select value={p.scale} onChange={(e) => set({ scale: e.target.value })}>
-            {Object.keys(SCALES).map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
-        <label>
-          Arpeggio
-          <select value={p.arp} onChange={(e) => set({ arp: e.target.value })}>
-            {Object.keys(ARPEGGIOS).map((s) => (
-              <option key={s}>{s}</option>
-            ))}
-          </select>
-        </label>
+            <label>
+              Root
+              <select value={p.root} onChange={(e) => set({ root: Number(e.target.value) })}>
+                {ROOTS.map((r, i) => (
+                  <option key={r} value={i}>
+                    {r}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Scale
+              <select value={p.scale} onChange={(e) => set({ scale: e.target.value })}>
+                {Object.keys(SCALES).map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </label>
+            <label>
+              Arpeggio
+              <select value={p.arp} onChange={(e) => set({ arp: e.target.value })}>
+                {Object.keys(ARPEGGIOS).map((s) => (
+                  <option key={s}>{s}</option>
+                ))}
+              </select>
+            </label>
           </>
         )}
         <label>
