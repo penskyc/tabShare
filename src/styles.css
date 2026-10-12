@@ -475,3 +475,24 @@ body.call-window > div { height: 100%; }
 .center-card.setup label { display: grid; gap: 5px; font-size: 13px; color: var(--muted); }
 .brand-sm { font-weight: 700; font-size: 22px; letter-spacing: -0.04em; }
 .link-btn { background: none; border: 0; padding: 0; cursor: pointer; text-decoration: underline; font: inherit; }
+
+/* ---------- practice mode ---------- */
+.stage-bar { display: flex; align-items: center; gap: 10px; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); }
+.tab-view { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+/* Practice keeps the tab mounted (no reload, same position) but out of sight; visibility keeps its size, so alphaTab
+   doesn't re-lay out at 0 px. */
+.stage { position: relative; }
+.tab-view.off { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
+.tab-view > .banner, .practice > .banner { margin: 10px 16px 0; }
+.practice { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.practice-bar { display: flex; flex-wrap: wrap; gap: 8px 14px; align-items: end; padding: 10px 16px; border-bottom: 1px solid var(--line); background: var(--bg); font-size: 12px; color: var(--muted); }
+.practice-bar label { display: grid; gap: 3px; }
+.practice-num { display: flex; gap: 6px; align-items: center; }
+.practice-num input { width: 110px; }
+.practice-num .mono { min-width: 28px; color: var(--text); }
+.practice-info { padding: 8px 16px; font-size: 13px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+.practice-info p { margin: 0 0 4px; }
+.practice-info ul { margin: 0; padding-left: 18px; color: var(--muted); }
+.practice-spacer { flex: 1; }
+.practice-transport { grid-area: auto; }
+.practice-small { width: 52px; }
