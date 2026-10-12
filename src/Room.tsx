@@ -14,6 +14,7 @@ import { SongsterrSearch } from './SongsterrSearch';
 import { Tuner } from './Tuner';
 import { setAudioSession } from './audioSession';
 import { Fretboard } from './Fretboard';
+import { Practice } from './Practice';
 import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from './OriginalAudio';
 import { playOrder } from '../shared/sync';
 
@@ -124,6 +125,12 @@ export function Room({ session, profile, onLeave }: Props) {
   // iOS: playback session (ignores the silent switch) unless the call, rig or tuner may be capturing (audioSession.ts).
   useEffect(() => setAudioSession(call.inCall || rig.on || showTuner), [call.inCall, rig.on, showTuner]);
   const [showFretboard, setShowFretboard] = useState(() => readPref('fretboard.open') === '1');
+  // Tab | Practice. Practice is solo with its own player; the room's tab stays loaded but paused and muted.
+  const [mode, setMode] = useState<'tab' | 'practice'>(() => (readPref('practice.mode') === 'practice' ? 'practice' : 'tab'));
+  const switchMode = (m: 'tab' | 'practice') => {
+    setMode(m);
+    writePref('practice.mode', m);
+  };
   const [zoom, setZoom] = useState(() => Number(readPref('zoom')) || 1);
   const toggleFretboard = () => {
     setShowFretboard((v) => (writePref('fretboard.open', v ? '' : '1'), !v));
@@ -450,9 +457,17 @@ export function Room({ session, profile, onLeave }: Props) {
     }
   };
 
-  // Space = play/pause (unless typing).
+  useEffect(() => {
+    if (!api) return;
+    if (mode === 'practice') api.pause();
+    // Muted, not stopped: remote jam play/seek still moves the hidden tab, so coming back rejoins the jam.
+    api.masterVolume = mode === 'practice' ? 0 : 1;
+  }, [api, mode]);
+
+  // Space = play/pause (unless typing; Practice has its own).
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
+      if (mode === 'practice') return;
       const tag = (e.target as HTMLElement)?.tagName;
       if (tag === 'INPUT' || tag === 'TEXTAREA') return;
       if (e.code === 'Space') {
@@ -462,7 +477,7 @@ export function Room({ session, profile, onLeave }: Props) {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [playPause]);
+  }, [playPause, mode]);
 
   // ---------- tracks: view, mute, solo (shared with jam users via room.mix) ----------
   useEffect(() => {
@@ -829,116 +844,131 @@ export function Room({ session, profile, onLeave }: Props) {
 
       <main className="stage">
         <CallPanel call={call} profile={profile} />
-        {error && <div className="banner error">{error}</div>}
-        {score && (
-          <div className="song-head">
-            <div>
-              <h2>{score.title || currentTab?.fileName}</h2>
-              <span className="muted">{[score.artist, score.album].filter(Boolean).join(' — ')}</span>
-            </div>
-            <div className="song-meta mono">
-              ♩ = {score.tempo} {room.loop && <span className="loop-badge">⟲ loop by {room.loop.setBy}</span>}
-              <span className="zoom" role="group" aria-label="Zoom">
-                <button onClick={() => changeZoom(zoom - 0.1)} disabled={zoom <= 0.5} aria-label="Zoom out">
-                  −
-                </button>
-                <button onClick={() => changeZoom(1)} title="Reset zoom">
-                  {Math.round(zoom * 100)}%
-                </button>
-                <button onClick={() => changeZoom(zoom + 0.1)} disabled={zoom >= 2} aria-label="Zoom in">
-                  +
-                </button>
-              </span>
-            </div>
+        <div className="stage-bar">
+          <div className="seg-mini" role="group" aria-label="Mode">
+            <button className={mode === 'tab' ? 'on' : ''} onClick={() => switchMode('tab')}>
+              Tab
+            </button>
+            <button className={mode === 'practice' ? 'on' : ''} onClick={() => switchMode('practice')}>
+              Practice
+            </button>
           </div>
-        )}
-        <ScoreView
-          ref={scoreRef}
-          data={tabData?.data ?? null}
-          ext={tabData?.ext ?? null}
-          peers={peers}
-          onApi={setApi}
-          onPointer={(cursor) => room.setPresence({ cursor })}
-          onSelection={(sel) => {
-            setSelection(sel);
-            room.setPresence({ selection: sel });
-          }}
-          onLoadError={(m) => setError(`Could not open tab: ${m}`)}
-        />
-        {showFretboard && <Fretboard api={api} score={score} />}
+        </div>
+        <div className={`tab-view ${mode === 'practice' ? 'off' : ''}`} aria-hidden={mode === 'practice'}>
+          {error && <div className="banner error">{error}</div>}
+          {score && (
+            <div className="song-head">
+              <div>
+                <h2>{score.title || currentTab?.fileName}</h2>
+                <span className="muted">{[score.artist, score.album].filter(Boolean).join(' — ')}</span>
+              </div>
+              <div className="song-meta mono">
+                ♩ = {score.tempo} {room.loop && <span className="loop-badge">⟲ loop by {room.loop.setBy}</span>}
+                <span className="zoom" role="group" aria-label="Zoom">
+                  <button onClick={() => changeZoom(zoom - 0.1)} disabled={zoom <= 0.5} aria-label="Zoom out">
+                    −
+                  </button>
+                  <button onClick={() => changeZoom(1)} title="Reset zoom">
+                    {Math.round(zoom * 100)}%
+                  </button>
+                  <button onClick={() => changeZoom(zoom + 0.1)} disabled={zoom >= 2} aria-label="Zoom in">
+                    +
+                  </button>
+                </span>
+              </div>
+            </div>
+          )}
+          <ScoreView
+            ref={scoreRef}
+            data={tabData?.data ?? null}
+            ext={tabData?.ext ?? null}
+            peers={peers}
+            onApi={setApi}
+            onPointer={(cursor) => room.setPresence({ cursor })}
+            onSelection={(sel) => {
+              setSelection(sel);
+              room.setPresence({ selection: sel });
+            }}
+            onLoadError={(m) => setError(`Could not open tab: ${m}`)}
+          />
+          {showFretboard && <Fretboard api={api} score={score} />}
+        </div>
+        {mode === 'practice' && <Practice tunerOn={showTuner} onToggleTuner={() => setShowTuner((v) => !v)} />}
       </main>
       {showTuner && <Tuner rig={rig} onClose={() => setShowTuner(false)} />}
 
-      <footer className="transport">
-        <div className="tp-group">
-          <button className="tp-btn" onClick={stop} disabled={!ready} title="Stop">
-            ■
-          </button>
-          <button className="tp-btn play" onClick={playPause} disabled={!ready || !score} title="Play / pause (space)">
-            {playing ? '❚❚' : '▶'}
-          </button>
-          <span className="mono time">
-            {fmtTime(pos.cur)} / {fmtTime(pos.end)}
-          </span>
-        </div>
-
-        <div className="tp-group">
-          <button
-            className={`tp-toggle ${room.loop ? 'on' : ''}`}
-            onClick={toggleLoop}
-            disabled={!score}
-            title={room.loop ? 'Clear shared loop' : selection ? 'Loop selection for everyone' : 'Drag across beats to select, then loop'}
-          >
-            ⟲ {room.loop ? 'Clear loop' : selection ? 'Loop selection' : 'Loop'}
-          </button>
-          <button className={`tp-toggle ${metronome ? 'on' : ''}`} onClick={() => changeMix({ metronome: !metronome })} disabled={original}>
-            Metronome
-          </button>
-          <button className={`tp-toggle ${countIn ? 'on' : ''}`} onClick={() => changeMix({ countIn: !countIn })} disabled={original}>
-            Count-in
-          </button>
-        </div>
-
-        <div className="tp-group">
-          <div className="seg-mini" role="group" aria-label="Audio source">
-            <button className={source === 'synth' ? 'on' : ''} onClick={() => changeMix({ source: 'synth' })} title="Synthesized playback with per-track controls">
-              Synth
+      {mode === 'tab' && (
+        <footer className="transport">
+          <div className="tp-group">
+            <button className="tp-btn" onClick={stop} disabled={!ready} title="Stop">
+              ■
             </button>
+            <button className="tp-btn play" onClick={playPause} disabled={!ready || !score} title="Play / pause (space)">
+              {playing ? '❚❚' : '▶'}
+            </button>
+            <span className="mono time">
+              {fmtTime(pos.cur)} / {fmtTime(pos.end)}
+            </span>
+          </div>
+  
+          <div className="tp-group">
             <button
-              className={source === 'original' ? 'on' : ''}
-              onClick={() => changeMix({ source: 'original' })}
+              className={`tp-toggle ${room.loop ? 'on' : ''}`}
+              onClick={toggleLoop}
               disabled={!score}
-              title={currentTab?.youtube ? 'Play the original recording (YouTube)' : 'Link a YouTube recording to this tab'}
+              title={room.loop ? 'Clear shared loop' : selection ? 'Loop selection for everyone' : 'Drag across beats to select, then loop'}
             >
-              Original
+              ⟲ {room.loop ? 'Clear loop' : selection ? 'Loop selection' : 'Loop'}
+            </button>
+            <button className={`tp-toggle ${metronome ? 'on' : ''}`} onClick={() => changeMix({ metronome: !metronome })} disabled={original}>
+              Metronome
+            </button>
+            <button className={`tp-toggle ${countIn ? 'on' : ''}`} onClick={() => changeMix({ countIn: !countIn })} disabled={original}>
+              Count-in
             </button>
           </div>
-        </div>
-
-        <div className="tp-group speed">
-          <label className="small muted" htmlFor="speed">
-            Speed
-          </label>
-          <input id="speed" type="range" min={0.25} max={1.5} step={0.05} value={speed} onChange={(e) => changeSpeed(Number(e.target.value))} />
-          <span className="mono">{Math.round(speed * 100)}%</span>
-        </div>
-
-        <div className="tp-group">
-          <button className={`tp-toggle jam ${jam ? 'on' : ''}`} onClick={toggleJam} title="Synced for everyone in jam: play/pause, seek, speed, Synth/Original, track view, mute, solo, metronome and count-in">
-            ● Jam sync {jam ? 'on' : 'off'}
-          </button>
-          {!ready && score && <span className="small muted">loading sounds…</span>}
-        </div>
-
-        <div className="tp-group">
-          <button className={`tp-toggle ${showTuner ? 'on' : ''}`} onClick={() => setShowTuner((v) => !v)} title="Chromatic tuner (uses your rig input or microphone)">
-            Tuner
-          </button>
-          <button className={`tp-toggle ${showFretboard ? 'on' : ''}`} onClick={toggleFretboard} title="Fretboard: scales, arpeggios, and the notes a track plays">
-            Fretboard
-          </button>
-        </div>
-      </footer>
+  
+          <div className="tp-group">
+            <div className="seg-mini" role="group" aria-label="Audio source">
+              <button className={source === 'synth' ? 'on' : ''} onClick={() => changeMix({ source: 'synth' })} title="Synthesized playback with per-track controls">
+                Synth
+              </button>
+              <button
+                className={source === 'original' ? 'on' : ''}
+                onClick={() => changeMix({ source: 'original' })}
+                disabled={!score}
+                title={currentTab?.youtube ? 'Play the original recording (YouTube)' : 'Link a YouTube recording to this tab'}
+              >
+                Original
+              </button>
+            </div>
+          </div>
+  
+          <div className="tp-group speed">
+            <label className="small muted" htmlFor="speed">
+              Speed
+            </label>
+            <input id="speed" type="range" min={0.25} max={1.5} step={0.05} value={speed} onChange={(e) => changeSpeed(Number(e.target.value))} />
+            <span className="mono">{Math.round(speed * 100)}%</span>
+          </div>
+  
+          <div className="tp-group">
+            <button className={`tp-toggle jam ${jam ? 'on' : ''}`} onClick={toggleJam} title="Synced for everyone in jam: play/pause, seek, speed, Synth/Original, track view, mute, solo, metronome and count-in">
+              ● Jam sync {jam ? 'on' : 'off'}
+            </button>
+            {!ready && score && <span className="small muted">loading sounds…</span>}
+          </div>
+  
+          <div className="tp-group">
+            <button className={`tp-toggle ${showTuner ? 'on' : ''}`} onClick={() => setShowTuner((v) => !v)} title="Chromatic tuner (uses your rig input or microphone)">
+              Tuner
+            </button>
+            <button className={`tp-toggle ${showFretboard ? 'on' : ''}`} onClick={toggleFretboard} title="Fretboard: scales, arpeggios, and the notes a track plays">
+              Fretboard
+            </button>
+          </div>
+        </footer>
+      )}
 
       {source === 'original' && score && (
         <OriginalAudio
