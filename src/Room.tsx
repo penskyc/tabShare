@@ -220,7 +220,9 @@ export function Room({ session, profile, onLeave }: Props) {
     offs.push(
       api.scoreLoaded.on((s) => {
         setScore(s);
-        setVisibleTracks([0]);
+        // Open on the bass part (GM programs 32–39); the first track if there's none.
+        const bass = s.tracks.find((t) => t.playbackInfo.program >= 32 && t.playbackInfo.program <= 39 && !t.staves[0]?.isPercussion);
+        setVisibleTracks([bass?.index ?? 0]);
         setMuted(new Set());
         setSoloed(new Set());
         setVolumes([]);
