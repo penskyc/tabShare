@@ -271,13 +271,22 @@ export function Room({ session, profile, onLeave }: Props) {
   }, [api]);
 
   // ---------- track rendering ----------
+  // Tab only: hide standard notation on staves that have a tab (drums, piano and vocals keep theirs). The file's own
+  // setting is remembered per staff so turning it off restores it.
+  const [tabOnly, setTabOnly] = useState(() => readPref('tabOnly') === '1');
+  const notationOf = useRef(new WeakMap<alphaTab.model.Staff, boolean>());
   useEffect(() => {
     if (!api || !score) return;
+    for (const staff of score.tracks.flatMap((t) => t.staves)) {
+      if (!notationOf.current.has(staff)) notationOf.current.set(staff, staff.showStandardNotation);
+      const own = notationOf.current.get(staff)!;
+      staff.showStandardNotation = tabOnly && staff.showTablature ? false : own;
+    }
     const tracks = score.tracks.filter((t) => visibleTracks.includes(t.index));
     if (tracks.length) api.renderTracks(tracks);
     room.setPresence({ tracks: visibleTracks });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [api, score, visibleTracks]);
+  }, [api, score, visibleTracks, tabOnly]);
 
   // ---------- shared loop ----------
   useEffect(() => {
@@ -509,6 +518,10 @@ export function Room({ session, profile, onLeave }: Props) {
     countIn?: boolean;
     source?: 'synth' | 'original';
   };
+  // Track view is your own unless you opt in: a guitarist and a bassist usually want different tracks on screen.
+  const [syncView, setSyncView] = useState(() => readPref('jam.syncView') === '1');
+  const syncViewRef = useRef(syncView);
+  syncViewRef.current = syncView;
   const mixSendTimer = useRef<number | undefined>(undefined);
   const changeMix = (c: MixChange) => {
     const next = {
@@ -533,7 +546,8 @@ export function Room({ session, profile, onLeave }: Props) {
     mixSendTimer.current = window.setTimeout(
       () =>
         room.sendMix({
-          tracks: next.tracks,
+          // Not following the jam's view: send the room's view back unchanged, so others' screens don't change.
+          tracks: syncViewRef.current ? next.tracks : (roomRef.current.mix?.tracks ?? next.tracks),
           muted: [...next.m],
           soloed: [...next.s],
           volumes: next.volumes,
@@ -556,6 +570,12 @@ export function Room({ session, profile, onLeave }: Props) {
     if (v.includes(i) && v.length === 1) return; // keep at least one track shown
     changeMix({ tracks: v.includes(i) ? v.filter((x) => x !== i) : [...v, i].sort((a, b) => a - b) });
   };
+  const toggleSyncView = (on: boolean) => {
+    setSyncView(on);
+    syncViewRef.current = on;
+    writePref('jam.syncView', on ? '1' : '');
+    if (on && jamRef.current) applyMix();
+  };
   const toggleMute = (t: alphaTab.model.Track) => changeMix({ m: toggleSet(muted, t.index) });
   const toggleSolo = (t: alphaTab.model.Track) => changeMix({ s: toggleSet(soloed, t.index) });
 
@@ -565,7 +585,7 @@ export function Room({ session, profile, onLeave }: Props) {
     const valid = (a: number[]) => a.filter((i) => i < score.tracks.length);
     const tracks = valid(m.tracks);
     // Same view → keep the array identity so the score isn't re-rendered.
-    if (tracks.length) setVisibleTracks((v) => (v.join() === tracks.join() ? v : tracks));
+    if (syncViewRef.current && tracks.length) setVisibleTracks((v) => (v.join() === tracks.join() ? v : tracks));
     setMuted(new Set(valid(m.muted)));
     setSoloed(new Set(valid(m.soloed)));
     setVolumes(m.volumes ?? []);
@@ -793,7 +813,9 @@ export function Room({ session, profile, onLeave }: Props) {
             {!score && <p className="muted small">Load a tab to see its tracks.</p>}
             {score && (
               <>
-                <p className="muted small">Your view is personal — show the parts you play.</p>
+                <label className="small muted check-line" title="On: the tracks you see follow the jam. Off: show only the parts you play (mute, solo and volume still sync).">
+                  <input type="checkbox" checked={syncView} onChange={(e) => toggleSyncView(e.target.checked)} /> Same track view as the jam
+                </label>
                 {original && <p className="banner note">Original audio is playing: mute, solo and volume only apply to the synth.</p>}
                 <ul className={`track-list ${original ? 'audio-off' : ''}`}>
                   {score.tracks.map((t) => (
@@ -864,6 +886,14 @@ export function Room({ session, profile, onLeave }: Props) {
               </div>
               <div className="song-meta mono">
                 ♩ = {score.tempo} {room.loop && <span className="loop-badge">⟲ loop by {room.loop.setBy}</span>}
+                <button
+                  className={`tab-only ${tabOnly ? 'on' : ''}`}
+                  onClick={() => setTabOnly((v) => (writePref('tabOnly', v ? '' : '1'), !v))}
+                  title="Hide standard notation and show only the tab (drums and other non-tab parts keep their staff)"
+                  aria-pressed={tabOnly}
+                >
+                  Tab only
+                </button>
                 <span className="zoom" role="group" aria-label="Zoom">
                   <button onClick={() => changeZoom(zoom - 0.1)} disabled={zoom <= 0.5} aria-label="Zoom out">
                     −

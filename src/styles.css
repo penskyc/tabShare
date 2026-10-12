@@ -500,3 +500,6 @@ body.call-window > div { height: 100%; }
 .practice-transport { grid-area: auto; }
 .practice-small { width: 52px; }
 .practice-bar select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color: var(--text); font-size: 13px; }
+.check-line { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; cursor: pointer; }
+.tab-only { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); padding: 3px 8px; font: inherit; font-size: 12px; }
+.tab-only.on { color: var(--text); border-color: var(--accent); background: #2b1b14; }
