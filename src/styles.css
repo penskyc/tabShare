@@ -367,7 +367,13 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 .rig-meter i { display: block; height: 100%; background: var(--ok); transition: width 60ms linear; }
 .rig-meter i.clip { background: var(--bad); }
 .rig-model { display: flex; align-items: center; gap: 8px; justify-content: space-between; }
-.rig-model strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.rig-model strong { font-weight: 500; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+/* Long model/tone/device names: grid and flex items default to their content width (a <select> to its longest
+   option), which widened the whole panel past the drawer. Let them shrink and wrap instead. */
+.rig .rig-section, .rig label, .rig select, .rig-model { min-width: 0; }
+.rig .rig-section { grid-template-columns: minmax(0, 1fr); }
+.rig label { overflow-wrap: anywhere; }
+.rig input[type=range] { margin-left: 0; margin-right: 0; } /* browser default 2px + width 100% overhangs */
 .vst-chain { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
 .vst-chain li { display: flex; align-items: center; gap: 4px; flex-wrap: wrap; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; }
 .vst-chain strong { font-weight: 500; }

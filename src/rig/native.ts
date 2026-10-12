@@ -68,7 +68,7 @@ interface NativeBridge {
 export const native = (window as unknown as { tabshareNative?: NativeBridge }).tabshareNative ?? null;
 
 /** The low-latency audio API the desktop engine opens, for UI copy. */
-export const NATIVE_DRIVER = native?.platform === 'darwin' ? 'Core Audio' : 'ASIO';
+export const NATIVE_DRIVER = native?.platform === 'win32' ? 'ASIO' : 'Core Audio'; // macOS and iOS: Core Audio
 
 /** Desktop installers the web app offers, per OS (served from the server's DATA_DIR/downloads; see /api/config). */
 /** Desktop installers are GitHub release assets (the same releases the apps update from). */

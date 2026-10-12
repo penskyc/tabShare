@@ -99,7 +99,7 @@ export function RigPanel({ rig, inCall }: { rig: RigControls; inCall: boolean })
     <div className="panel rig">
       {rig.native ? (
         <p className="muted small">
-          Play through a NAM amp model and send it into the call. Desktop app: your interface runs through <strong>{NATIVE_DRIVER}</strong> for
+          Play through a NAM amp model and send it into the call. In the app, your interface runs through <strong>{NATIVE_DRIVER}</strong> for
           low-latency monitoring. Use headphones.
         </p>
       ) : (
