@@ -34,18 +34,26 @@ function loadPrefs(): Prefs {
 type Spot = { s: number; f: number };
 
 /** Easyfrets-style fretboard: scales/arpeggios for any tuning, and the notes a track plays under the playhead. */
-export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; score: alphaTab.model.Score | null }) {
-  const [p, setP] = useState<Prefs>(loadPrefs);
+/** Practice mode drives the board: follow this track, show these resting dots; the saved prefs aren't changed. */
+export interface ForcedBoard {
+  follow: number;
+  root: number;
+  set: number[];
+}
+
+export function Fretboard({ api, score, forced }: { api: alphaTab.AlphaTabApi | null; score: alphaTab.model.Score | null; forced?: ForcedBoard }) {
+  const [saved, setP] = useState<Prefs>(loadPrefs);
+  const p: Prefs = forced ? { ...saved, follow: forced.follow, root: forced.root, inst: 'bass', tuning: 0 } : saved;
   const [playing, setPlaying] = useState<Spot[]>([]);
   const set = (patch: Partial<Prefs>) => setP((old) => ({ ...old, ...patch }));
 
   useEffect(() => {
     try {
-      localStorage.setItem(PREF, JSON.stringify(p));
+      localStorage.setItem(PREF, JSON.stringify(saved));
     } catch {
       /* storage blocked */
     }
-  }, [p]);
+  }, [saved]);
 
   // Stringed tracks of the current tab (drums and pianos can't be shown on a fretboard).
   const tracks = useMemo(
@@ -78,8 +86,8 @@ export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; sc
     return () => api.playerPositionChanged.off(handler);
   }, [api, following, p.follow]);
 
-  const scale = SCALES[p.scale] ?? [];
-  const arp = ARPEGGIOS[p.arp] ?? [];
+  const scale = forced ? forced.set : (SCALES[p.scale] ?? []);
+  const arp = forced ? [] : (ARPEGGIOS[p.arp] ?? []);
   const n = strings.length;
   const H = n * ROW + 34;
   // Fret spacing between real (shrinking) and even, so high frets stay usable.
@@ -114,6 +122,7 @@ export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; sc
   return (
     <div className="fretboard">
       <div className="fb-controls">
+        {!forced && (
         <label>
           Follow
           <select value={following ? p.follow : -1} onChange={(e) => set({ follow: Number(e.target.value) })} title="Light up the notes this track plays under the playhead">
@@ -125,7 +134,8 @@ export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; sc
             ))}
           </select>
         </label>
-        {!following && (
+        )}
+        {!forced && !following && (
           <>
             <div className="seg-mini" role="group" aria-label="Instrument">
               {(['guitar', 'bass'] as const).map((i) => (
@@ -146,6 +156,8 @@ export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; sc
             </label>
           </>
         )}
+        {!forced && (
+          <>
         <label>
           Root
           <select value={p.root} onChange={(e) => set({ root: Number(e.target.value) })}>
@@ -172,6 +184,8 @@ export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; sc
             ))}
           </select>
         </label>
+          </>
+        )}
         <label>
           Labels
           <select value={p.labels} onChange={(e) => set({ labels: e.target.value as Prefs['labels'] })}>
@@ -196,7 +210,7 @@ export function Fretboard({ api, score }: { api: alphaTab.AlphaTabApi | null; sc
         </label>
       </div>
       <div className="fb-scroll">
-        <svg viewBox={`0 0 ${W} ${H}`} className="fb-svg" role="img" aria-label={`${following ? 'Notes played by ' + (followed!.name || 'the track') : 'Fretboard'}: ${p.scale === 'Off' ? '' : ROOTS[p.root] + ' ' + p.scale}`}>
+        <svg viewBox={`0 0 ${W} ${H}`} className="fb-svg" role="img" aria-label={forced ? 'Practice fretboard' : `${following ? 'Notes played by ' + (followed!.name || 'the track') : 'Fretboard'}: ${p.scale === 'Off' ? '' : ROOTS[p.root] + ' ' + p.scale}`}>
           <rect className="fb-wood" x={Math.min(mx(fretX(0)), mx(fretX(p.frets)))} y={16} width={Math.abs(fretX(p.frets) - fretX(0))} height={n * ROW} rx={3} />
           {INLAYS.filter((f) => f <= p.frets).map((f) => (
             <circle key={f} className="fb-inlay" cx={mx(noteX(f))} cy={16 + (n * ROW) / 2} r={6} />
