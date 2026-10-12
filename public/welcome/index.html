@@ -138,6 +138,8 @@
       .shot-pair { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; }
       .shot-pair .shot:last-child { margin-top: 48px; }
       .tall { max-width: 360px; justify-self: center; }
+      .honest { margin-top: 22px; padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg-2); color: var(--soft); font-size: 14px; line-height: 1.55; }
+      .honest b { color: var(--text); }
 
       /* latency comparison */
       .latency { display: grid; gap: 14px; margin: 6px 0 30px; max-width: 520px; }
@@ -212,6 +214,7 @@
       <a class="wordmark" href="#top">tab<span>Share</span></a>
       <div class="links">
         <a href="#together">Play together</a>
+        <a href="#call">Call</a>
         <a href="#practice">Practice</a>
         <a href="#rig">Amp rig</a>
         <a href="#desktop">Desktop app</a>
@@ -292,7 +295,7 @@
           <p>Everyone in the room sees the same tab, live. Jam sync keeps playback, speed and the whole mix together, so when you hit play, the band hears it with you.</p>
           <ul class="frets">
             <li><b>0</b><span>Live cursors, selections and playheads <i>· per person, in their colour</i></span></li>
-            <li><b>3</b><span>Jam sync <i>· play, pause, seek, speed, tracks, mute/solo, volume</i></span></li>
+            <li><b>3</b><span>Jam sync <i>· play, pause, seek, speed, mute/solo, volume, and the track view, or keep your own</i></span></li>
             <li><b>5</b><span>Shared loops <i>· select a passage, loop it for the room</i></span></li>
             <li><b>7</b><span>Synth or the original <i>· a YouTube recording, tap-synced to the bars</i></span></li>
           </ul>
@@ -313,7 +316,8 @@
             <li><b>0</b><span>Songsterr search and import <i>· all tracks, named</i></span></li>
             <li><b>2</b><span>Guitar Pro 3–8, MusicXML, Capella <i>· drag and drop</i></span></li>
             <li><b>4</b><span>alphaTex editor <i>· write tabs as text</i></span></li>
-            <li><b>5</b><span>Per-track view, mute, solo and volume</span></li>
+            <li><b>5</b><span>Opens on the bass part <i>· per-track view, mute, solo and volume</i></span></li>
+            <li><b>7</b><span>Tab only, or tab + notation <i>· light or dark score, better synth sounds</i></span></li>
           </ul>
         </div>
         <div class="shot-pair reveal">
@@ -323,8 +327,28 @@
       </div>
     </section>
 
-    <section class="bar-sec" id="practice">
+    <section class="bar-sec" id="call">
       <span class="barno">3</span>
+      <div class="copy reveal" style="max-width: 760px">
+        <h2>Hear each other<br /><em>play.</em></h2>
+        <p>Start a call from the room and everyone's camera and mic join in. Turn on your rig and your guitar or bass goes into the call as its own sound, next to your voice: the others hear your amp tone straight from your interface, not your mic picking up the room. Each person sets how loud everyone's voice and instrument are.</p>
+        <ul class="frets">
+          <li><b>0</b><span>Start or join the call <i>· camera, mic, speakers, share a screen</i></span></li>
+          <li><b>1</b><span>Turn on your rig <i>· Rig panel: pick your interface input and an amp model</i></span></li>
+          <li><b>2</b><span>Send to call <i>· on by default; your instrument travels as its own track</i></span></li>
+          <li><b>3</b><span>🎤 and 🎸 lights <i>· on every video tile, so you can see each person's voice and instrument coming through</i></span></li>
+          <li><b>5</b><span>🎚 Mix <i>· set each person's voice and instrument volume separately, remembered by name</i></span></li>
+          <li><b>7</b><span>Chat, pop-out and picture-in-picture <i>· the call in its own window, or floating while you're elsewhere</i></span></li>
+        </ul>
+        <p class="honest"><b>Wear headphones</b>, so your speakers don't feed back into your mic. And one honest limit: the internet adds a short delay, so you hear each other a moment late. That's great for learning parts, trading riffs and talking a song through. To play tightly in time, jam sync starts the backing track on everyone's machine together, and each of you plays along to that.</p>
+      </div>
+      <figure class="shot label-tr wide reveal" data-label="Mike's voice and bass both coming through, with the Mix panel open" style="margin: clamp(32px, 5vw, 56px) 0 0">
+        <img src="img/call.jpg" alt="A call with two video tiles; Mike's tile shows both the voice and instrument lights on, and the Mix panel has separate Voice and Instrument sliders for him" loading="lazy" width="2320" height="486" />
+      </figure>
+    </section>
+
+    <section class="bar-sec" id="neck">
+      <span class="barno">4</span>
       <div class="split">
         <div class="copy reveal">
           <h2>Learn it<br /><em>on the neck.</em></h2>
@@ -346,8 +370,28 @@
       </figure>
     </section>
 
+    <section class="bar-sec" id="practice">
+      <span class="barno">5</span>
+      <div class="split flip">
+        <div class="copy reveal">
+          <h2>Practice<br /><em>with a purpose.</em></h2>
+          <p>Switch from Tab to Practice for bass drills written out as real tabs in any key. Change the key, the progression or the tempo and the tab rewrites itself, while the fretboard lights up every note you should be playing.</p>
+          <ul class="frets">
+            <li><b>0</b><span>22 exercises <i>· warm-ups, scales, arpeggios, walking bass, grooves, theory</i></span></li>
+            <li><b>2</b><span>Any key, 4- or 5-string <i>· walking lines over I-IV-V, ii-V-I, 12-bar blues…</i></span></li>
+            <li><b>3</b><span>The fretboard follows <i>· the scale or chord at rest, each note as it plays</i></span></li>
+            <li><b>5</b><span>Loop, metronome, count-in <i>· and speed up a few BPM every time it comes around</i></span></li>
+            <li><b>7</b><span>Just for you <i>· the room keeps its tab; switch back and you're in the jam again</i></span></li>
+          </ul>
+        </div>
+        <figure class="shot label-tr reveal" data-label="A walking line in A, the fretboard following" style="margin: 0">
+          <img src="img/practice.jpg" alt="Practice mode: a chromatic-approach walking bass exercise in A, with the fretboard lighting the note being played" loading="lazy" width="2320" height="1688" />
+        </figure>
+      </div>
+    </section>
+
     <section class="bar-sec" id="rig">
-      <span class="barno">4</span>
+      <span class="barno">6</span>
       <div class="split">
         <div class="copy reveal">
           <h2>Plug in.<br /><em>Sound like you.</em></h2>
@@ -356,8 +400,8 @@
             <li><b>0</b><span>NAM amp models <i>· local .nam files or browse TONE3000</i></span></li>
             <li><b>2</b><span>Cab impulse responses</span></li>
             <li><b>3</b><span>VST3 plugins <i>· before or after the amp, on/off switch, search, their own windows (desktop app)</i></span></li>
-            <li><b>5</b><span>Video and voice call <i>· pop out split screen, picture-in-picture, pick a screen to share, "original sound" for instruments</i></span></li>
-            <li><b>7</b><span>Chat <i>· with link previews</i></span></li>
+            <li><b>5</b><span>Straight into the call <i>· your tone as its own track, <a href="#call">see how</a></i></span></li>
+            <li><b>7</b><span>Hear yourself <i>· monitor through your interface; the desktop app keeps the delay low</i></span></li>
           </ul>
         </div>
         <figure class="shot tall reveal" data-label="Desktop app rig" style="margin: 0">
@@ -367,7 +411,7 @@
     </section>
 
     <section class="bar-sec" id="desktop">
-      <span class="barno">5</span>
+      <span class="barno">7</span>
       <div class="split flip">
         <div class="copy reveal">
           <h2>The desktop app<br /><em>gets out of the way.</em></h2>
@@ -393,7 +437,7 @@
     </section>
 
     <section class="bar-sec">
-      <span class="barno">6</span>
+      <span class="barno">8</span>
       <div class="grid-head reveal">
         <h2>The whole <em>set list.</em></h2>
         <p>Everything tabShare does today, in a browser or the desktop app.</p>
@@ -403,14 +447,18 @@
         <div class="cell"><span class="n">02</span><h3>Tabs that render</h3><p>Guitar Pro, MusicXML and alphaTex, drawn as notation + tab by alphaTab.</p></div>
         <div class="cell"><span class="n">03</span><h3>Songsterr import</h3><p>Search and add a song for the whole room, every track included.</p></div>
         <div class="cell"><span class="n">04</span><h3>Presence</h3><p>See everyone's cursor, selection and playhead as they move.</p></div>
-        <div class="cell"><span class="n">05</span><h3>Jam sync</h3><p>Transport and the full mix shared by everyone who opts in. Late joiners catch up.</p></div>
-        <div class="cell"><span class="n">06</span><h3>Practice tools</h3><p>Speed trainer, metronome, count-in, shared or personal loops, and zoom for the tab.</p></div>
+        <div class="cell"><span class="n">05</span><h3>Jam sync</h3><p>Transport and the mix shared by everyone who opts in, the track view too or your own. Late joiners catch up.</p></div>
+        <div class="cell"><span class="n">06</span><h3>Practice tools</h3><p>Metronome, count-in, shared or personal loops, and zoom for the tab.</p></div>
         <div class="cell"><span class="n">07</span><h3>Original audio</h3><p>Switch the synth for the real recording on YouTube, synced bar by bar.</p></div>
         <div class="cell"><span class="n">08</span><h3>Call + chat</h3><p>Video and voice for a few friends, share the screen you pick, chat with link previews.</p></div>
         <div class="cell"><span class="n">09</span><h3>Amp rig</h3><p>NAM models from disk or TONE3000, cab IRs, all mixed into the call.</p></div>
         <div class="cell"><span class="n">10</span><h3>Native engine</h3><p>ASIO / Core Audio monitoring, VST3 plugins you can switch on and off, in-app updates.</p></div>
         <div class="cell"><span class="n">11</span><h3>Tuner + fretboard</h3><p>Tune from your rig or mic; see scales, arpeggios and the notes a track plays on the neck.</p></div>
         <div class="cell"><span class="n">12</span><h3>Pop-out + PiP</h3><p>The call in its own window, split screen with you in the corner, or a floating box while you're elsewhere.</p></div>
+        <div class="cell"><span class="n">13</span><h3>Instruments in the call</h3><p>Everyone's rig arrives as its own sound next to their voice, each with its own volume.</p></div>
+        <div class="cell"><span class="n">14</span><h3>Practice mode</h3><p>22 bass drills in any key, with a fretboard that follows and a speed-up-each-loop trainer.</p></div>
+        <div class="cell"><span class="n">15</span><h3>Better sound</h3><p>Full-size instrument banks for the synth on desktop and web; a light one on phones.</p></div>
+        <div class="cell"><span class="n">16</span><h3>Your way to read</h3><p>Tab only or tab + notation, light or dark score, and tabs open on the bass part.</p></div>
       </div>
     </section>
 
