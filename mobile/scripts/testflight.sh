@@ -4,6 +4,10 @@
 # the build number is the current time, so every upload is newer than the last.
 set -e
 cd "$(dirname "$0")/.."
+# App Store Connect rejects builds from beta Xcodes ("Unsupported SDK or Xcode version"); use the released one even
+# when xcode-select points at Xcode-beta.
+if [ -z "$DEVELOPER_DIR" ] && [ -d /Applications/Xcode.app ]; then export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer; fi
+echo "Building with $(xcodebuild -version | head -1) ($(xcodebuild -version | tail -1))"
 OUT=build/testflight
 rm -rf "$OUT" && mkdir -p "$OUT"
 npx expo prebuild --platform ios --clean
