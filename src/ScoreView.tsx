@@ -2,6 +2,7 @@ import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } f
 import * as alphaTab from '@coderline/alphatab';
 import type { Peer, ScorePoint, TickRange } from '../shared/protocol';
 import { onSoundBankChange, soundBankUrl } from './soundfont';
+import { isScoreDark, onScoreThemeChange, themer, useScoreDark } from './scoreTheme';
 
 type BoundsLookup = NonNullable<alphaTab.AlphaTabApi['renderer']['boundsLookup']>;
 
@@ -124,6 +125,7 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
   const apiRef = useRef<alphaTab.AlphaTabApi | null>(null);
   const [layout, setLayout] = useState<Layout | null>(null);
   const [loading, setLoading] = useState(false);
+  const dark = useScoreDark();
 
   // Latest callbacks without re-creating the alphaTab instance.
   const cb = useRef({ onApi, onPointer, onSelection, onLoadError });
@@ -142,6 +144,14 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
       },
     } as alphaTab.json.SettingsJson);
     apiRef.current = api;
+    // Light/dark paper: set before the first render, re-render on a switch.
+    const theme = themer(api.settings.display.resources);
+    theme(isScoreDark());
+    const offTheme = onScoreThemeChange(() => {
+      theme(isScoreDark());
+      api.updateSettings();
+      if (api.score) api.render();
+    });
 
     api.renderStarted.on(() => setLoading(true));
     api.renderFinished.on(() => {
@@ -164,6 +174,7 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
     cb.current.onApi(api);
     return () => {
       offBank();
+      offTheme();
       cb.current.onApi(null);
       apiRef.current = null;
       api.destroy();
@@ -245,7 +256,7 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
           <p className="muted">Drop a Guitar Pro file (.gp, .gp5, .gpx…) or MusicXML anywhere on the page, or use “Add tab”.</p>
         </div>
       )}
-      <div className="score-paper" ref={wrapRef} onPointerMove={onMove} onPointerLeave={() => cb.current.onPointer(null)} hidden={!data}>
+      <div className={`score-paper ${dark ? 'dark' : ''}`} ref={wrapRef} onPointerMove={onMove} onPointerLeave={() => cb.current.onPointer(null)} hidden={!data}>
         <div ref={mainRef} className="score-main" />
         <svg className="score-overlay">{overlays}</svg>
         {loading && <div className="score-loading">Rendering…</div>}

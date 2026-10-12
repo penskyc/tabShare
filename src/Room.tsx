@@ -16,6 +16,7 @@ import { setAudioSession } from './audioSession';
 import { Fretboard } from './Fretboard';
 import { Practice } from './Practice';
 import { lightOnly, setSoundBank, SOUND_BANKS, useSoundBank, type SoundBankId } from './soundfont';
+import { setScoreDark, useScoreDark } from './scoreTheme';
 import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from './OriginalAudio';
 import { playOrder } from '../shared/sync';
 
@@ -527,6 +528,7 @@ export function Room({ session, profile, onLeave }: Props) {
   // Track view follows the jam unless you turn it off (a guitarist and a bassist may want different tracks on screen).
   const [syncView, setSyncView] = useState(() => readPref('jam.syncView') !== '0');
   const soundBank = useSoundBank();
+  const scoreDark = useScoreDark();
   const syncViewRef = useRef(syncView);
   syncViewRef.current = syncView;
   const mixSendTimer = useRef<number | undefined>(undefined);
@@ -912,6 +914,9 @@ export function Room({ session, profile, onLeave }: Props) {
                   aria-pressed={tabOnly}
                 >
                   Tab only
+                </button>
+                <button className={`tab-only ${scoreDark ? 'on' : ''}`} onClick={() => setScoreDark(!scoreDark)} title="Dark or light score" aria-pressed={scoreDark}>
+                  {scoreDark ? '☾ Dark' : '☀ Light'}
                 </button>
                 <span className="zoom" role="group" aria-label="Zoom">
                   <button onClick={() => changeZoom(zoom - 0.1)} disabled={zoom <= 0.5} aria-label="Zoom out">

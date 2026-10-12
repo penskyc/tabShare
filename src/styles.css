@@ -505,3 +505,4 @@ body.call-window > div { height: 100%; }
 .tab-only.on { color: var(--text); border-color: var(--accent); background: #2b1b14; }
 .sound-bank { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
 .sound-bank select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; color: var(--text); font-size: 12px; flex: 1; min-width: 0; }
+.score-paper.dark { background: #1a1a22; color: var(--text); }
