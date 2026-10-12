@@ -13,11 +13,10 @@ const desktopApp = !!native && native.platform !== 'ios';
 let sharedCtx: AudioContext | null = null;
 const audioCtx = () => (sharedCtx ??= new AudioContext());
 
-/** True while the stream's audio is above a speaking threshold (with a short hang time). */
-function useSpeaking(stream: MediaStream | null, enabled: boolean) {
+/** True while the track's level is above `threshold` RMS (with a short hang time). */
+function useActive(track: MediaStreamTrack | null | undefined, enabled: boolean, threshold: number) {
   const [speaking, setSpeaking] = useState(false);
   useEffect(() => {
-    const track = stream?.getAudioTracks()[0];
     if (!track || !enabled) {
       setSpeaking(false);
       return;
@@ -36,7 +35,7 @@ function useSpeaking(stream: MediaStream | null, enabled: boolean) {
       let sum = 0;
       for (const v of buf) sum += ((v - 128) / 128) ** 2;
       const now = performance.now();
-      if (Math.sqrt(sum / buf.length) > 0.035) lastLoud = now;
+      if (Math.sqrt(sum / buf.length) > threshold) lastLoud = now;
       const next = now - lastLoud < 350;
       if (next !== on) setSpeaking((on = next));
     }, 100);
@@ -44,7 +43,7 @@ function useSpeaking(stream: MediaStream | null, enabled: boolean) {
       clearInterval(timer);
       src.disconnect();
     };
-  }, [stream, enabled]);
+  }, [track, enabled, threshold]);
   return speaking;
 }
 
@@ -54,13 +53,17 @@ interface TileProps {
   color: string;
   state: CallState;
   self?: boolean;
+  /** Their voice and instrument tracks, for the activity lights (instrument null: not sending one). */
+  voice: MediaStreamTrack | null;
+  instrument: MediaStreamTrack | null;
   pinned: boolean;
   onPin: () => void;
 }
 
-function Tile({ stream, name, color, state, self, pinned, onPin }: TileProps) {
+function Tile({ stream, name, color, state, self, voice, instrument, pinned, onPin }: TileProps) {
   const ref = useRef<HTMLVideoElement>(null);
-  const speaking = useSpeaking(stream, state.mic);
+  const speaking = useActive(voice, state.mic, 0.035);
+  const playing = useActive(instrument, true, 0.02);
   const showVideo = state.cam || state.screen;
 
   // Video only: call audio plays through the mix (callAudio.ts).
@@ -80,6 +83,17 @@ function Tile({ stream, name, color, state, self, pinned, onPin }: TileProps) {
       <div className="tile-label">
         {!state.mic && <span title="Muted">🔇</span>} {name}
         {state.screen && <span className="muted"> · screen</span>}
+      </div>
+      {/* Lights up while audio actually arrives on that track: is their voice / instrument coming through? */}
+      <div className="tile-meters">
+        <span className={speaking ? 'on' : ''} title={speaking ? 'Voice coming through' : 'No voice signal'}>
+          🎤
+        </span>
+        {instrument && (
+          <span className={playing ? 'on' : ''} title={playing ? 'Instrument coming through' : 'No instrument signal'}>
+            🎸
+          </span>
+        )}
       </div>
     </div>
   );
@@ -177,8 +191,26 @@ export function CallPanel({ call, profile }: { call: CallControls; profile: Prof
   }
 
   const tiles = [
-    { id: 'self', stream: call.localStream, name: `${profile.name} (you)`, color: profile.color, state: { mic: call.mic, cam: call.cam, screen: call.screen }, self: true },
-    ...others.map((p) => ({ id: p.clientId, stream: call.remoteStreams[p.clientId] ?? null, name: p.name, color: p.color, state: p.call!, self: false })),
+    {
+      id: 'self',
+      stream: call.localStream,
+      voice: call.localStream?.getAudioTracks()[0] ?? null,
+      instrument: call.localInstrument,
+      name: `${profile.name} (you)`,
+      color: profile.color,
+      state: { mic: call.mic, cam: call.cam, screen: call.screen },
+      self: true,
+    },
+    ...others.map((p) => ({
+      id: p.clientId,
+      stream: call.remoteStreams[p.clientId] ?? null,
+      voice: call.remoteParts[p.clientId]?.voice ?? null,
+      instrument: call.remoteParts[p.clientId]?.instrument ?? null,
+      name: p.name,
+      color: p.color,
+      state: p.call!,
+      self: false,
+    })),
   ].sort((a, b) => Number(b.id === pinned) - Number(a.id === pinned));
 
   return (

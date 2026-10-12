@@ -132,6 +132,7 @@ NSString *base64(const float *x, int n) {
   dispatch_source_t _timer;
   int _levelTick;
   int _silentLevels;  // consecutive level reports of exact digital silence (a dead input, not a quiet one)
+  NSDictionary *_lastStart;  // the page's start message, to restart by ourselves after an interruption
 }
 
 - (instancetype)initWithEmitter:(void (^)(NSString *))emit {
@@ -162,7 +163,10 @@ NSString *base64(const float *x, int n) {
     @try {
       if ([type isEqual:@"devices"]) [self sendDevices];
       else if ([type isEqual:@"start"]) [self start:m];
-      else if ([type isEqual:@"stop"]) [self stop];
+      else if ([type isEqual:@"stop"]) {
+        self->_lastStart = nil;
+        [self stop];
+      }
       else if ([type isEqual:@"params"]) [self params:m[@"params"]];
       else if ([type isEqual:@"loadModel"]) [self loadModel:m[@"json"]];
       else if ([type isEqual:@"unloadModel"]) [self swapAmp:nullptr];
@@ -239,6 +243,7 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
 
 - (void)start:(NSDictionary *)m {
   [self stop];
+  _lastStart = m;
   AVAudioSession *s = AVAudioSession.sharedInstance;
   NSError *err = nil;
   if (![self setRecordCategory:&err])
@@ -307,11 +312,17 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
 }
 
 - (void)stop {
+  if (![self halt]) return;
+  [self send:@{@"type" : @"stopped"}];
+}
+
+/** Tears the audio unit down without telling the page. Returns NO if nothing was running. */
+- (BOOL)halt {
   if (_timer) {
     dispatch_source_cancel(_timer);
     _timer = nil;
   }
-  if (!_unit) return;
+  if (!_unit) return NO;
   AudioOutputUnitStop(_unit);
   AudioUnitUninitialize(_unit);
   AudioComponentInstanceDispose(_unit);
@@ -321,7 +332,34 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
   _running = NO;
   // Hand the session back to the page (WebKit plays the synth and the call through it): default mode, no measurement.
   [AVAudioSession.sharedInstance setMode:AVAudioSessionModeDefault error:nil];
-  [self send:@{@"type" : @"stopped"}];
+  return YES;
+}
+
+/**
+ * The session was taken from under the rig (starting a call in the web view does this once). Starting again works, so
+ * do it ourselves — a few tries, and only on the same interface (never fall back to the built-in mic: feedback).
+ * The page keeps its state; a successful start sends `started` again, which rebuilds its call feed.
+ */
+- (void)resumeAfter:(NSString *)why attempt:(int)attempt {
+  const double delays[] = {0.6, 1.5, 3.0};
+  dispatch_after(dispatch_time(DISPATCH_TIME_NOW, (int64_t)(delays[attempt] * NSEC_PER_SEC)), _queue, ^{
+    NSDictionary *m = self->_lastStart;
+    if (self->_running || !m) return;  // the page started or stopped the rig in the meantime
+    BOOL present = NO;
+    for (AVAudioSessionPortDescription *p in AVAudioSession.sharedInstance.availableInputs) present |= [p.portName isEqual:m[@"device"]];
+    if (present) {
+      @try {
+        [self start:m];
+        return;
+      } @catch (NSException *e) {
+        [self halt];
+        if (attempt < 2) return [self resumeAfter:why attempt:attempt + 1];
+      }
+    }
+    self->_lastStart = nil;
+    [self send:@{@"type" : @"stopped"}];
+    [self error:[NSString stringWithFormat:@"%@ Turn the rig back on.", present ? why : @"The audio interface was disconnected."]];
+  });
 }
 
 - (void)shutdown {
@@ -344,8 +382,8 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
   if (reason != AVAudioSessionRouteChangeReasonOldDeviceUnavailable) return;
   dispatch_async(_queue, ^{
     if (!self->_running) return;
-    [self stop];
-    [self error:@"The audio interface was disconnected. Turn the rig back on."];
+    [self halt];
+    [self resumeAfter:[NSString stringWithFormat:@"The audio input went away (%@).", sessionInfo()] attempt:0];
   });
 }
 
@@ -355,8 +393,8 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
   dispatch_async(_queue, ^{
     if (!self->_running) return;
     NSString *info = sessionInfo();
-    [self stop];
-    [self error:[NSString stringWithFormat:@"Audio was interrupted (reason %lu; %@). Turn the rig back on.", (unsigned long)reason, info]];
+    [self halt];
+    [self resumeAfter:[NSString stringWithFormat:@"Audio was interrupted (reason %lu; %@).", (unsigned long)reason, info] attempt:0];
   });
 }
 

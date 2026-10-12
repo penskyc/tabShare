@@ -460,6 +460,8 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
     devices,
     localStream,
     remoteStreams: Object.fromEntries(Object.entries(remote).map(([id, r]) => [id, r.stream])),
+    remoteParts: remote as Record<string, { voice: MediaStreamTrack | null; instrument: MediaStreamTrack | null }>,
+    localInstrument: instrumentStream?.getAudioTracks()[0] ?? null,
     levelsFor,
     setLevel,
     peersInCall: peersInCall as Peer[],

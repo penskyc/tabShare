@@ -261,7 +261,10 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 .tile video[hidden] { display: none; }
 .tile video.mirror { transform: scaleX(-1); }
 .tile-avatar { position: absolute; inset: 0; display: grid; place-items: center; font-size: 34px; font-weight: 700; color: #111; background: radial-gradient(circle, var(--c) 0 34px, var(--bg-2) 35px); }
-.tile-label { position: absolute; left: 6px; bottom: 6px; right: 6px; font-size: 12px; background: #000a; padding: 2px 7px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: fit-content; max-width: calc(100% - 12px); }
+.tile-label { position: absolute; left: 6px; bottom: 6px; right: 6px; font-size: 12px; background: #000a; padding: 2px 7px; border-radius: 6px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; width: fit-content; max-width: calc(100% - 70px); }
+.tile-meters { position: absolute; right: 6px; bottom: 6px; display: flex; gap: 4px; }
+.tile-meters span { font-size: 12px; line-height: 1; padding: 4px 5px; border-radius: 6px; background: #000a; opacity: 0.45; transition: opacity 120ms, box-shadow 120ms, background 120ms; }
+.tile-meters span.on { opacity: 1; background: var(--accent); box-shadow: 0 0 10px var(--accent); }
 /* call mix: each person's voice and instrument */
 .call-mix { display: grid; gap: 8px; padding: 10px 12px; background: var(--panel); border: 1px solid var(--line); border-radius: 12px; }
 .call-mix-row { display: grid; grid-template-columns: minmax(70px, 140px) 1fr 1fr; gap: 6px 14px; align-items: center; }
