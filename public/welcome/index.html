@@ -138,8 +138,6 @@
       .shot-pair { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; }
       .shot-pair .shot:last-child { margin-top: 48px; }
       .tall { max-width: 360px; justify-self: center; }
-      .honest { margin-top: 22px; padding: 14px 16px; border: 1px solid var(--line); border-left: 3px solid var(--accent); border-radius: 10px; background: var(--bg-2); color: var(--soft); font-size: 14px; line-height: 1.55; }
-      .honest b { color: var(--text); }
 
       /* latency comparison */
       .latency { display: grid; gap: 14px; margin: 6px 0 30px; max-width: 520px; }
@@ -311,9 +309,9 @@
       <div class="split flip">
         <div class="copy reveal">
           <h2>Any song,<br /><em>one search away.</em></h2>
-          <p>Search Songsterr from the library and add a song for the whole room in a second, with every track. Or drop in your own files, or write a tab right in the app.</p>
+          <p>Search for any tab right from the library and add it for the whole room in a second, with every track. Or drop in your own files, or write a tab right in the app.</p>
           <ul class="frets">
-            <li><b>0</b><span>Songsterr search and import <i>· all tracks, named</i></span></li>
+            <li><b>0</b><span>Tab search and import <i>· all tracks, named</i></span></li>
             <li><b>2</b><span>Guitar Pro 3–8, MusicXML, Capella <i>· drag and drop</i></span></li>
             <li><b>4</b><span>alphaTex editor <i>· write tabs as text</i></span></li>
             <li><b>5</b><span>Opens on the bass part <i>· per-track view, mute, solo and volume</i></span></li>
@@ -321,7 +319,7 @@
           </ul>
         </div>
         <div class="shot-pair reveal">
-          <figure class="shot" data-label="Library + Songsterr" style="margin: 0"><img src="img/songsterr.jpg" alt="Songsterr search results in the library panel" loading="lazy" width="1040" height="1200" /></figure>
+          <figure class="shot" data-label="Library + tab search" style="margin: 0"><img src="img/tab-search.jpg" alt="Tab search results in the library panel" loading="lazy" width="1040" height="1200" /></figure>
           <figure class="shot" data-label="Lobby" style="margin: 0"><img src="img/lobby.jpg" alt="The tabShare lobby" loading="lazy" width="2880" height="1760" /></figure>
         </div>
       </div>
@@ -329,27 +327,28 @@
 
     <section class="bar-sec" id="call">
       <span class="barno">3</span>
-      <div class="copy reveal" style="max-width: 760px">
-        <h2>Hear each other<br /><em>play.</em></h2>
-        <p>Start a call from the room and everyone's camera and mic join in. Turn on your rig and your guitar or bass goes into the call as its own sound, next to your voice: the others hear your amp tone straight from your interface, not your mic picking up the room. Each person sets how loud everyone's voice and instrument are.</p>
-        <ul class="frets">
-          <li><b>0</b><span>Start or join the call <i>· camera, mic, speakers, share a screen</i></span></li>
-          <li><b>1</b><span>Turn on your rig <i>· Rig panel: pick your interface input and an amp model</i></span></li>
-          <li><b>2</b><span>Send to call <i>· on by default; your instrument travels as its own track</i></span></li>
-          <li><b>3</b><span>🎤 and 🎸 lights <i>· on every video tile, so you can see each person's voice and instrument coming through</i></span></li>
-          <li><b>5</b><span>🎚 Mix <i>· set each person's voice and instrument volume separately, remembered by name</i></span></li>
-          <li><b>7</b><span>Chat, pop-out and picture-in-picture <i>· the call in its own window, or floating while you're elsewhere</i></span></li>
-        </ul>
-        <p class="honest"><b>Wear headphones</b>, so your speakers don't feed back into your mic. And one honest limit: the internet adds a short delay, so you hear each other a moment late. That's great for learning parts, trading riffs and talking a song through. To play tightly in time, jam sync starts the backing track on everyone's machine together, and each of you plays along to that.</p>
+      <div class="split">
+        <div class="copy reveal">
+          <h2>Hear each other<br /><em>play.</em></h2>
+          <p>Start a call from the room and everyone's camera and mic join in. Turn on your rig and your guitar or bass goes into the call as its own sound, next to your voice: the others hear your amp tone straight from your interface, not your mic picking up the room. Each person sets how loud everyone's voice and instrument are.</p>
+          <ul class="frets">
+            <li><b>0</b><span>Start or join the call <i>· camera, mic, speakers, share a screen</i></span></li>
+            <li><b>1</b><span>Turn on your rig <i>· Rig panel: pick your interface input and an amp model</i></span></li>
+            <li><b>2</b><span>Send to call <i>· on by default; your instrument travels as its own track</i></span></li>
+            <li><b>3</b><span>🎤 and 🎸 lights <i>· on every video tile, so you can see each person's voice and instrument coming through</i></span></li>
+            <li><b>5</b><span>🎚 Mix <i>· set each person's voice and instrument volume separately, remembered by name</i></span></li>
+            <li><b>7</b><span>Chat, pop-out and picture-in-picture <i>· the call in its own window, or floating while you're elsewhere</i></span></li>
+          </ul>
+        </div>
+        <figure class="shot label-tr reveal" data-label="Voice and bass both coming through" style="margin: 0">
+          <img src="img/call.jpg" alt="A call with two video tiles; Mike's tile shows both the voice and instrument lights on, and the Mix panel has separate Voice and Instrument sliders for him" loading="lazy" width="1280" height="662" />
+        </figure>
       </div>
-      <figure class="shot label-tr wide reveal" data-label="Mike's voice and bass both coming through, with the Mix panel open" style="margin: clamp(32px, 5vw, 56px) 0 0">
-        <img src="img/call.jpg" alt="A call with two video tiles; Mike's tile shows both the voice and instrument lights on, and the Mix panel has separate Voice and Instrument sliders for him" loading="lazy" width="2320" height="486" />
-      </figure>
     </section>
 
     <section class="bar-sec" id="neck">
       <span class="barno">4</span>
-      <div class="split">
+      <div class="split flip">
         <div class="copy reveal">
           <h2>Learn it<br /><em>on the neck.</em></h2>
           <p>A fretboard under the tab shows any scale or arpeggio in any tuning, or follows a track and lights up the notes it plays as the song goes. Tune up without leaving the room.</p>
@@ -372,7 +371,7 @@
 
     <section class="bar-sec" id="practice">
       <span class="barno">5</span>
-      <div class="split flip">
+      <div class="split">
         <div class="copy reveal">
           <h2>Practice<br /><em>with a purpose.</em></h2>
           <p>Switch from Tab to Practice for bass drills written out as real tabs in any key. Change the key, the progression or the tempo and the tab rewrites itself, while the fretboard lights up every note you should be playing.</p>
@@ -392,7 +391,7 @@
 
     <section class="bar-sec" id="rig">
       <span class="barno">6</span>
-      <div class="split">
+      <div class="split flip">
         <div class="copy reveal">
           <h2>Plug in.<br /><em>Sound like you.</em></h2>
           <p>Bring your guitar or bass into the room through a neural amp model, a cab IR and your favourite plugins, then send that tone straight into the call.</p>
@@ -412,7 +411,7 @@
 
     <section class="bar-sec" id="desktop">
       <span class="barno">7</span>
-      <div class="split flip">
+      <div class="split">
         <div class="copy reveal">
           <h2>The desktop app<br /><em>gets out of the way.</em></h2>
           <p>Same rooms, same site, plus a native audio engine. Your interface runs through ASIO on Windows and Core Audio on Mac, so you hear yourself without the browser's delay. It also hosts your VST3 plugins, and it updates itself.</p>
@@ -445,7 +444,7 @@
       <div class="grid reveal">
         <div class="cell"><span class="n">01</span><h3>Invite-only rooms</h3><p>Password rooms with invite links; the host manages them from an admin page.</p></div>
         <div class="cell"><span class="n">02</span><h3>Tabs that render</h3><p>Guitar Pro, MusicXML and alphaTex, drawn as notation + tab by alphaTab.</p></div>
-        <div class="cell"><span class="n">03</span><h3>Songsterr import</h3><p>Search and add a song for the whole room, every track included.</p></div>
+        <div class="cell"><span class="n">03</span><h3>Tab search and import</h3><p>Search and add a song for the whole room, every track included.</p></div>
         <div class="cell"><span class="n">04</span><h3>Presence</h3><p>See everyone's cursor, selection and playhead as they move.</p></div>
         <div class="cell"><span class="n">05</span><h3>Jam sync</h3><p>Transport and the mix shared by everyone who opts in, the track view too or your own. Late joiners catch up.</p></div>
         <div class="cell"><span class="n">06</span><h3>Practice tools</h3><p>Metronome, count-in, shared or personal loops, and zoom for the tab.</p></div>
@@ -467,7 +466,6 @@
         <a class="wordmark" href="#top">tab<span>Share</span></a>
         <div class="staff-foot" aria-hidden="true"></div>
       </div>
-      <p>Built for a few friends who play together from different houses. Rooms are private and invite-only; ask the host for a link.</p>
       <a class="btn primary" href="/#/">Log in</a>
     </footer>
 

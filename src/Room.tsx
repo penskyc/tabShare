@@ -785,7 +785,7 @@ export function Room({ session, profile, onLeave }: Props) {
               }}
             />
             <ul className="tab-list">
-              {room.tabs.length === 0 && <li className="muted small">Library is empty. Search Songsterr above, or add a Guitar Pro file.</li>}
+              {room.tabs.length === 0 && <li className="muted small">Library is empty. Search for a tab above, or add a Guitar Pro file.</li>}
               {room.tabs.map((t) => (
                 <li key={t.id} className={t.id === room.currentTabId ? 'active' : ''}>
                   <button

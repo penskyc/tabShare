@@ -40,7 +40,7 @@ export function SongsterrSearch({ session, by, onImported }: { session: Session;
   return (
     <div className="songsterr">
       <form className="row gap" onSubmit={search}>
-        <input className="grow" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search Songsterr: artist or song" aria-label="Search Songsterr" />
+        <input className="grow" value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search tabs: artist or song" aria-label="Search tabs" />
         <button className="btn" disabled={busy !== null}>
           {busy === 'search' ? '…' : 'Search'}
         </button>

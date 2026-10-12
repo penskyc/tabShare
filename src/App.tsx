@@ -145,7 +145,7 @@ function Lobby({
         </div>
         <p className="tagline">Open a tab. Invite the band. Everyone sees the same score, hears the same mix, and plays along together.</p>
         <ul className="features">
-          <li>Songsterr search &amp; import · Guitar Pro, MusicXML, alphaTex</li>
+          <li>Tab search &amp; import · Guitar Pro, MusicXML, alphaTex</li>
           <li>Live cursors, selections, playheads &amp; shared loops</li>
           <li>Jam sync: play, speed, tracks &amp; mix for everyone</li>
           <li>Synth or the original recording, tap-synced to the tab</li>
