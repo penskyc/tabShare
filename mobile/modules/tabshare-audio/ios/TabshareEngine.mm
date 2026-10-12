@@ -180,11 +180,24 @@ NSString *base64(const float *x, int n) {
 
 #pragma mark - devices
 
+/** Measurement mode: no automatic gain, echo cancellation or EQ on the instrument. */
+- (BOOL)setRecordCategory:(NSError **)err {
+  return [AVAudioSession.sharedInstance setCategory:AVAudioSessionCategoryPlayAndRecord mode:AVAudioSessionModeMeasurement
+                                            options:AVAudioSessionCategoryOptionDefaultToSpeaker | AVAudioSessionCategoryOptionMixWithOthers
+                                              error:err];
+}
+
 - (void)sendDevices {
   AVAudioSession *s = AVAudioSession.sharedInstance;
+  // iOS lists external inputs only under a record category, and the page's own session is playback (silent switch).
+  if (!_running) [self setRecordCategory:nil];
   NSMutableArray *devices = [NSMutableArray array];
   for (AVAudioSessionPortDescription *p in s.availableInputs) {
-    NSUInteger channels = MAX((NSUInteger)1, p.channels.count);
+    NSUInteger channels = p.channels.count;
+    for (AVAudioSessionPortDescription *r in s.currentRoute.inputs)
+      if ([r.UID isEqual:p.UID]) channels = MAX(channels, r.channels.count);
+    // shortcut: an interface iOS hasn't opened yet reports no channels; assume 2 (start opens what it really has).
+    if (!channels) channels = [p.portType isEqual:AVAudioSessionPortUSBAudio] ? 2 : 1;
     [devices addObject:@{@"name" : p.portName, @"inputs" : @(channels), @"outputs" : @2}];
   }
   [self send:@{@"type" : @"devices", @"devices" : devices}];
@@ -219,10 +232,7 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
   [self stop];
   AVAudioSession *s = AVAudioSession.sharedInstance;
   NSError *err = nil;
-  // Measurement mode: no automatic gain, echo cancellation or EQ on the instrument.
-  if (![s setCategory:AVAudioSessionCategoryPlayAndRecord mode:AVAudioSessionModeMeasurement
-              options:AVAudioSessionCategoryOptionDefaultToSpeaker | AVAudioSessionCategoryOptionMixWithOthers
-                error:&err])
+  if (![self setRecordCategory:&err])
     @throw [NSException exceptionWithName:@"audio" reason:err.localizedDescription ?: @"Couldn't set up audio" userInfo:nil];
   int bufferSize = MAX(32, MIN([m[@"bufferSize"] intValue] ?: 128, 1024));
   [s setPreferredSampleRate:48000 error:nil];
@@ -311,7 +321,11 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
 }
 
 - (void)routeChanged:(NSNotification *)n {
-  if ([n.userInfo[AVAudioSessionRouteChangeReasonKey] unsignedIntegerValue] != AVAudioSessionRouteChangeReasonOldDeviceUnavailable) return;
+  NSUInteger reason = [n.userInfo[AVAudioSessionRouteChangeReasonKey] unsignedIntegerValue];
+  // An interface plugged in or out: refresh the page's device list.
+  if (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable)
+    dispatch_async(_queue, ^{ [self sendDevices]; });
+  if (reason != AVAudioSessionRouteChangeReasonOldDeviceUnavailable) return;
   dispatch_async(_queue, ^{
     if (!self->_running) return;
     [self stop];

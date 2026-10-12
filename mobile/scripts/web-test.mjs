@@ -20,8 +20,15 @@ try {
   page.on('pageerror', (e) => fail(`page error: ${e.message}`));
   await page.addInitScript(() => {
     window.__gumAudio = 0;
+    // WebKit's audio session: audio capture fails unless the page switched to play-and-record.
+    navigator.audioSession = { type: 'auto' };
     const gum = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-    navigator.mediaDevices.getUserMedia = (c) => (c?.audio && window.__gumAudio++, gum(c));
+    navigator.mediaDevices.getUserMedia = (c) => {
+      if (!c?.audio) return gum(c);
+      if (navigator.audioSession.type !== 'play-and-record') return Promise.reject(new DOMException('AudioSession category is not compatible with audio capture.', 'InvalidStateError'));
+      window.__gumAudio++;
+      return gum(c);
+    };
     const L = new Set();
     const out = (m) => setTimeout(() => L.forEach((l) => l(m)), 5);
     window.__out = out;
@@ -49,6 +56,7 @@ try {
   await page.getByPlaceholder('e.g. Corey').fill('iPad');
   await page.locator('input[type=password]').first().fill('smoke1234');
   await page.locator('button.btn.primary.big').click();
+  await page.waitForFunction(() => navigator.audioSession.type === 'playback', null, { timeout: 5000 }).catch(() => fail('room did not ask for a playback session (silent switch)'));
   await page.getByRole('button', { name: /^Rig/ }).first().click();
   const voice = page.getByLabel(/Voice \(call\)/);
   const options = await voice.locator('option').allTextContents();
@@ -67,6 +75,15 @@ try {
   await page.getByRole('button', { name: /turn off rig/i }).click();
   await page.waitForTimeout(1500);
   if ((await gum()) !== 1) fail('call did not take the mic back after the rig turned off');
+  const session = () => page.evaluate(() => navigator.audioSession.type);
+  if ((await session()) !== 'play-and-record') fail(`session during the call: ${await session()}`);
+  await page.getByRole('button', { name: /Leave call/ }).click();
+  await page.waitForTimeout(300);
+  if ((await session()) !== 'playback') fail(`session after leaving the call: ${await session()}`);
+  // Joining from playback (the bug: the mic was requested before the room switched the session).
+  await page.getByRole('button', { name: /Start call|Join call/ }).first().click();
+  await page.waitForTimeout(1500);
+  if ((await gum()) !== 2) fail('joining a call from a playback session did not capture the mic');
   const errors = await page.locator('.call-error').allTextContents();
   if (errors.length) fail(`errors shown: ${errors}`);
 
@@ -111,7 +128,7 @@ try {
   await page.getByRole('button', { name: /turn on rig/i }).click(); // the engine gets the model while the rig is on
   await page.waitForFunction(() => window.__sent.some((m) => m.type === 'loadModel'), null, { timeout: 5000 }).catch(() => fail('picked tone was not loaded'));
   if (!(await page.getByText('Test tone').count())) fail('tone name not shown');
-  console.log(process.exitCode ? 'iOS web test failed' : 'iOS web test passed: voice picker, voiceChannel, no mic capture while the rig is on, mic back after, TONE3000 via the app');
+  console.log(process.exitCode ? 'iOS web test failed' : 'iOS web test passed: voice picker, voiceChannel, no mic capture while the rig is on, mic back after, TONE3000 via the app, audio session switches');
 } finally {
   await browser.close();
   await fetch(`${api}/api/admin/rooms/${room.roomId}`, { method: 'DELETE', headers: admin });
