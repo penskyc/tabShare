@@ -15,6 +15,7 @@ import { Tuner } from './Tuner';
 import { setAudioSession } from './audioSession';
 import { Fretboard } from './Fretboard';
 import { Practice } from './Practice';
+import { lightOnly, setSoundBank, SOUND_BANKS, useSoundBank, type SoundBankId } from './soundfont';
 import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from './OriginalAudio';
 import { playOrder } from '../shared/sync';
 
@@ -271,16 +272,19 @@ export function Room({ session, profile, onLeave }: Props) {
   }, [api]);
 
   // ---------- track rendering ----------
-  // Tab only: hide standard notation on staves that have a tab (drums, piano and vocals keep theirs). The file's own
-  // setting is remembered per staff so turning it off restores it.
-  const [tabOnly, setTabOnly] = useState(() => readPref('tabOnly') === '1');
+  // Tab only (on unless turned off): guitar and bass staves show just the tab; drums, keys, vocals keep their notation.
+  // The file's own setting is remembered per staff so turning it off restores it.
+  const [tabOnly, setTabOnly] = useState(() => readPref('tabOnly') !== '0');
   const notationOf = useRef(new WeakMap<alphaTab.model.Staff, boolean>());
   useEffect(() => {
     if (!api || !score) return;
-    for (const staff of score.tracks.flatMap((t) => t.staves)) {
-      if (!notationOf.current.has(staff)) notationOf.current.set(staff, staff.showStandardNotation);
-      const own = notationOf.current.get(staff)!;
-      staff.showStandardNotation = tabOnly && staff.showTablature ? false : own;
+    for (const track of score.tracks) {
+      const guitarOrBass = track.playbackInfo.program >= 24 && track.playbackInfo.program <= 39; // GM guitars + basses
+      for (const staff of track.staves) {
+        if (!notationOf.current.has(staff)) notationOf.current.set(staff, staff.showStandardNotation);
+        const own = notationOf.current.get(staff)!;
+        staff.showStandardNotation = tabOnly && guitarOrBass && staff.showTablature ? false : own;
+      }
     }
     const tracks = score.tracks.filter((t) => visibleTracks.includes(t.index));
     if (tracks.length) api.renderTracks(tracks);
@@ -518,8 +522,9 @@ export function Room({ session, profile, onLeave }: Props) {
     countIn?: boolean;
     source?: 'synth' | 'original';
   };
-  // Track view is your own unless you opt in: a guitarist and a bassist usually want different tracks on screen.
-  const [syncView, setSyncView] = useState(() => readPref('jam.syncView') === '1');
+  // Track view follows the jam unless you turn it off (a guitarist and a bassist may want different tracks on screen).
+  const [syncView, setSyncView] = useState(() => readPref('jam.syncView') !== '0');
+  const soundBank = useSoundBank();
   const syncViewRef = useRef(syncView);
   syncViewRef.current = syncView;
   const mixSendTimer = useRef<number | undefined>(undefined);
@@ -573,7 +578,7 @@ export function Room({ session, profile, onLeave }: Props) {
   const toggleSyncView = (on: boolean) => {
     setSyncView(on);
     syncViewRef.current = on;
-    writePref('jam.syncView', on ? '1' : '');
+    writePref('jam.syncView', on ? '1' : '0');
     if (on && jamRef.current) applyMix();
   };
   const toggleMute = (t: alphaTab.model.Track) => changeMix({ m: toggleSet(muted, t.index) });
@@ -816,6 +821,18 @@ export function Room({ session, profile, onLeave }: Props) {
                 <label className="small muted check-line" title="On: the tracks you see follow the jam. Off: show only the parts you play (mute, solo and volume still sync).">
                   <input type="checkbox" checked={syncView} onChange={(e) => toggleSyncView(e.target.checked)} /> Same track view as the jam
                 </label>
+                {!lightOnly() && (
+                  <label className="small muted sound-bank" title="The synth's instrument sounds. Bigger banks sound better; each downloads once, then it's cached.">
+                    Sound
+                    <select value={soundBank} onChange={(e) => setSoundBank(e.target.value as SoundBankId)}>
+                      {SOUND_BANKS.map((b) => (
+                        <option key={b.id} value={b.id}>
+                          {b.name} ({b.size})
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                )}
                 {original && <p className="banner note">Original audio is playing: mute, solo and volume only apply to the synth.</p>}
                 <ul className={`track-list ${original ? 'audio-off' : ''}`}>
                   {score.tracks.map((t) => (
@@ -888,8 +905,8 @@ export function Room({ session, profile, onLeave }: Props) {
                 ♩ = {score.tempo} {room.loop && <span className="loop-badge">⟲ loop by {room.loop.setBy}</span>}
                 <button
                   className={`tab-only ${tabOnly ? 'on' : ''}`}
-                  onClick={() => setTabOnly((v) => (writePref('tabOnly', v ? '' : '1'), !v))}
-                  title="Hide standard notation and show only the tab (drums and other non-tab parts keep their staff)"
+                  onClick={() => setTabOnly((v) => (writePref('tabOnly', v ? '0' : '1'), !v))}
+                  title="Guitar and bass: show only the tab, without standard notation (drums, keys and vocals keep theirs)"
                   aria-pressed={tabOnly}
                 >
                   Tab only

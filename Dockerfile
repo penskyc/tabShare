@@ -5,6 +5,8 @@ COPY package.json package-lock.json ./
 COPY scripts ./scripts
 RUN npm ci
 COPY . .
+# Full-size sound banks (~72 MB, sha256-pinned; not in git).
+RUN node scripts/fetch-soundfonts.mjs
 RUN npm run build
 
 # ---- runtime ----

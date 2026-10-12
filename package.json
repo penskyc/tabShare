@@ -10,7 +10,8 @@
     "build": "vite build",
     "start": "tsx server/index.ts",
     "typecheck": "tsc --noEmit -p .",
-    "test": "tsx --test server/*.test.ts shared/*.test.ts desktop/convolver.test.mjs"
+    "test": "tsx --test server/*.test.ts shared/*.test.ts desktop/convolver.test.mjs",
+    "soundfonts": "node scripts/fetch-soundfonts.mjs"
   },
   "dependencies": {
     "@coderline/alphatab": "^1.8.4",

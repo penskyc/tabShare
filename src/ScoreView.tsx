@@ -1,6 +1,7 @@
 import { useEffect, useImperativeHandle, useMemo, useRef, useState, type Ref } from 'react';
 import * as alphaTab from '@coderline/alphatab';
 import type { Peer, ScorePoint, TickRange } from '../shared/protocol';
+import { onSoundBankChange, soundBankUrl } from './soundfont';
 
 type BoundsLookup = NonNullable<alphaTab.AlphaTabApi['renderer']['boundsLookup']>;
 
@@ -134,7 +135,7 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
       display: { layoutMode: alphaTab.LayoutMode.Page, scale: 1.0 },
       player: {
         playerMode: alphaTab.PlayerMode.EnabledSynthesizer,
-        soundFont: '/soundfont/sonivox.sf2',
+        soundFont: soundBankUrl(),
         scrollElement: scrollRef.current!,
         enableUserInteraction: true,
         scrollOffsetY: -40,
@@ -157,8 +158,12 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
       cb.current.onLoadError(e.message ?? String(e));
     });
 
+    // Switching the sound bank reloads it in place (no page reload; playback keeps its position).
+    const offBank = onSoundBankChange(() => api.loadSoundFont(soundBankUrl(), false));
+
     cb.current.onApi(api);
     return () => {
+      offBank();
       cb.current.onApi(null);
       apiRef.current = null;
       api.destroy();
