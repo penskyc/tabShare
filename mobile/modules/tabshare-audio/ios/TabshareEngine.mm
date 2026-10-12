@@ -131,6 +131,7 @@ NSString *base64(const float *x, int n) {
   dispatch_queue_t _queue;  // messages, model loading and the drain timer, in order
   dispatch_source_t _timer;
   int _levelTick;
+  int _silentLevels;  // consecutive level reports of exact digital silence (a dead input, not a quiet one)
 }
 
 - (instancetype)initWithEmitter:(void (^)(NSString *))emit {
@@ -179,6 +180,14 @@ NSString *base64(const float *x, int n) {
 }
 
 #pragma mark - devices
+
+/** For error messages: what the shared audio session looks like right now (WebKit uses it too). */
+static NSString *sessionInfo() {
+  AVAudioSession *s = AVAudioSession.sharedInstance;
+  return [NSString stringWithFormat:@"session %@/%@, input %@", [s.category stringByReplacingOccurrencesOfString:@"AVAudioSessionCategory" withString:@""],
+                                    [s.mode stringByReplacingOccurrencesOfString:@"AVAudioSessionMode" withString:@""],
+                                    s.currentRoute.inputs.firstObject.portName ?: @"none"];
+}
 
 /** Measurement mode: no automatic gain, echo cancellation or EQ on the instrument. */
 - (BOOL)setRecordCategory:(NSError **)err {
@@ -325,6 +334,13 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
   // An interface plugged in or out: refresh the page's device list.
   if (reason == AVAudioSessionRouteChangeReasonNewDeviceAvailable || reason == AVAudioSessionRouteChangeReasonOldDeviceUnavailable)
     dispatch_async(_queue, ^{ [self sendDevices]; });
+  // Something else in the app (WebKit) reconfigured the session under the running rig: report it.
+  if (reason == AVAudioSessionRouteChangeReasonCategoryChange || reason == AVAudioSessionRouteChangeReasonOverride)
+    dispatch_async(_queue, ^{
+      AVAudioSession *s = AVAudioSession.sharedInstance;
+      if (self->_running && (![s.category isEqual:AVAudioSessionCategoryPlayAndRecord] || ![s.mode isEqual:AVAudioSessionModeMeasurement]))
+        [self error:[NSString stringWithFormat:@"The audio session was changed under the rig (%@).", sessionInfo()]];
+    });
   if (reason != AVAudioSessionRouteChangeReasonOldDeviceUnavailable) return;
   dispatch_async(_queue, ^{
     if (!self->_running) return;
@@ -335,10 +351,12 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
 
 - (void)interrupted:(NSNotification *)n {
   if ([n.userInfo[AVAudioSessionInterruptionTypeKey] unsignedIntegerValue] != AVAudioSessionInterruptionTypeBegan) return;
+  NSUInteger reason = [n.userInfo[AVAudioSessionInterruptionReasonKey] unsignedIntegerValue];
   dispatch_async(_queue, ^{
     if (!self->_running) return;
+    NSString *info = sessionInfo();
     [self stop];
-    [self error:@"Audio was interrupted (a call or another app). Turn the rig back on."];
+    [self error:[NSString stringWithFormat:@"Audio was interrupted (reason %lu; %@). Turn the rig back on.", (unsigned long)reason, info]];
   });
 }
 
@@ -346,6 +364,7 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
 
 /** Every 20 ms: call audio and tuner samples in 1024-sample blocks, input level every 60 ms. */
 - (void)startTimer {
+  _silentLevels = 0;
   _timer = dispatch_source_create(DISPATCH_SOURCE_TYPE_TIMER, 0, 0, _queue);
   dispatch_source_set_timer(_timer, dispatch_time(DISPATCH_TIME_NOW, 0), 20 * NSEC_PER_MSEC, 5 * NSEC_PER_MSEC);
   dispatch_source_set_event_handler(_timer, ^{ [self drain]; });
@@ -358,7 +377,13 @@ static OSStatus renderCallback(void *ref, AudioUnitRenderActionFlags *flags, con
   while (_dsp.voice.pop(block, kFeedBlock)) [self send:@{@"type" : @"voice", @"samples" : base64(block, kFeedBlock)}];
   while (_dsp.tap.pop(block, kFeedBlock))
     [self send:@{@"type" : @"tap", @"samples" : base64(block, kFeedBlock), @"sampleRate" : @(_rate)}];
-  if (++_levelTick % 3 == 0) [self send:@{@"type" : @"level", @"peak" : @(_dsp.peak.exchange(0))}];
+  if (++_levelTick % 3 == 0) {
+    float peak = _dsp.peak.exchange(0);
+    [self send:@{@"type" : @"level", @"peak" : @(peak)}];
+    // ~3 s of exact zeros: the input is dead (another audio unit took it?). Say so once, with the session state.
+    _silentLevels = peak > 0 ? 0 : _silentLevels + 1;
+    if (_silentLevels == 50) [self error:[NSString stringWithFormat:@"No signal from the input (%@).", sessionInfo()]];
+  }
 }
 
 #pragma mark - params and models
