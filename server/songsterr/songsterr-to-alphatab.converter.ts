@@ -422,7 +422,8 @@ export class SongsterrToAlphaTabConverter {
     );
 
     const track = new alphaTab.model.Track();
-    track.name = trackMeta.title || trackMeta.name || revision.name || 'Track';
+    // Unnamed parts show their instrument on Songsterr ("Electric Bass (pick)"), so use it before a generic name.
+    track.name = [trackMeta.title, trackMeta.name, revision.name, trackMeta.instrument, revision.instrument].map((s) => s?.trim()).find(Boolean) || 'Track';
     track.shortName = track.name.slice(0, 20);
     track.playbackInfo.program = playbackMapping.program;
     track.playbackInfo.primaryChannel = channel;

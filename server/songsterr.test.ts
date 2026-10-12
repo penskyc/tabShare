@@ -12,3 +12,13 @@ test('search, convert to GP7 and re-import with alphaTab', { skip: !process.env.
   assert.equal(score.artist, song.artist);
   assert.ok(score.tracks.length > 0 && score.masterBars.length > 10);
 });
+
+test('unnamed Songsterr parts are named after their instrument, like on Songsterr', { skip: !process.env.SONGSTERR_LIVE && 'set SONGSTERR_LIVE=1' }, async () => {
+  // blink-182 "Whats My Age Again AI": all three parts have an empty name on Songsterr.
+  const { data } = await downloadSong(2264964);
+  const score = alphaTab.importer.ScoreLoader.loadScoreFromBytes(new Uint8Array(data), new alphaTab.Settings());
+  assert.deepEqual(
+    score.tracks.map((t) => t.name),
+    ['Distortion Guitar', 'Electric Bass (pick)', 'Drums'],
+  );
+});

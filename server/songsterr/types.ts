@@ -21,6 +21,8 @@ export interface SongsterrStateMetaCurrentTrack {
   instrumentId: number;
   title?: string;
   name?: string;
+  /** Songsterr shows this when `name` is empty. */
+  instrument?: string;
   tuning?: number[];
   isDrums?: boolean;
 }
@@ -114,6 +116,7 @@ export interface SongsterrRevisionMeasurePayload {
 
 export interface SongsterrRevisionTrackPayload {
   name?: string;
+  instrument?: string;
   instrumentId?: number;
   tuning?: number[];
   strings?: number;
