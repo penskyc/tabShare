@@ -34,6 +34,14 @@ macOS) that loads the live site and runs the rig through a native **ASIO** (Wind
 - `src/Tuner.tsx`: tuner panel (transport "Tuner"). Input: desktop engine `tap` messages (dry selected channel, engine 0.2.2+; falls back to the mic if none arrive in 1.5 s), else the browser rig's `tapNode` (inGain), else getUserMedia. Detects every 50 ms on 4096 samples, median of 5.
 - `src/Fretboard.tsx`: fretboard drawer under the score (transport "Fretboard"): tunings, root, scales, arpeggios, notes/intervals, roots, left-handed, 12–24 frets, and **Follow** a stringed track: `api.tickCache.findBeat(Set([track]), tick)` on `playerPositionChanged` (works for tracks that aren't rendered; `activeBeatsChanged` only reports rendered ones). Prefs in `tabshare.fretboard`, open state in `tabshare.fretboard.open`.
 - `src/CallWindow.tsx`: renders the call into a second window: `useChildWindow(open, content, onClosed)` (own React root, since events from another document never reach the main root; styles copied; videos muted, audio stays in the main page), `CallStage` (pop-out: others split-screen, you bottom-right, mute/cam/full screen) and `CallPip`. CallPanel: **⧉ Pop out** (`window.open('', 'tabshare-call')`), desktop auto-PiP (`window.open('', 'tabshare-pip')`; main.js makes it borderless, always on top, bottom-right, shown without focus) driven by `native.onAppFocus`, browser **PiP** button + Chrome's auto-PiP via `mediaSession` 'enterpictureinpicture' (Document Picture-in-Picture). Classes are `cw-*` (the copied stylesheet already has `.stage`).
+- `shared/exercises.ts` + `src/Practice.tsx`: **Practice mode** (Tab | Practice switch in the stage bar). 22 bass
+  exercises generated from key/options/tuning/tempo: pitches → `place()` (5-fret hand position) → 4/4 bars →
+  `toAlphaTex` (the only alphaTex writer; alphaTex string 1 = highest string). Practice has its own ScoreView/alphaTab
+  api (solo, never synced) and the Fretboard in `forced` mode (locked Follow + resting dots, saved prefs untouched).
+  Room keeps the tab view mounted but hidden (`.tab-view.off`, visibility so alphaTab keeps its width) and paused +
+  muted (`masterVolume = 0`) while practicing, so remote jam moves still update it. Speed trainer = `playbackSpeed` on
+  each loop wrap. Settings per exercise in `tabshare.practice.<id>`. Tests: `shared/exercises.test.ts` builds every
+  exercise × key × option × tuning and parses the alphaTex in Node (`AlphaTexImporter`). Spec/plan in `docs/superpowers/`.
 - Phone/tablet layout: the side panel becomes a drawer (☰) at `(max-width: 860px), (max-height: 500px), (hover: none) and (pointer: coarse)` (phones in any orientation, every iPad), in `styles.css` and `useNarrow` (Room.tsx); the compact header (icon-only buttons) is only for small screens.
 - `mobile/`: iPhone/iPad app (Expo SDK 57, local Xcode builds, TestFlight). WebView of the server + `window.tabshareNative` bridge (`src/bridge.ts`) to a native rig (`modules/tabshare-audio`: RemoteIO + NeuralAmpModelerCore). iOS has one input device, so with the rig on the call's voice comes from an interface input (`voice` stream replaces the mic in `useCall`). See `mobile/README.md`.
 - `desktop/picker.html` + `picker-preload.cjs`: screen-share picker (thumbnails of screens + windows, tabShare's own windows excluded, screens labelled with resolution and "main").
@@ -115,5 +123,6 @@ Local `.env` (gitignored): `ADMIN_PASSWORD=devadmin`, `TONE3000_CLIENT_ID=t3k_pu
 - Browse TONE3000 IRs (cab impulse responses) like NAM models; save rig presets per user.
 - Show remote players' rig/amp name in their call tile.
 - Comments and annotations pinned to bars (Figma-style).
-- Bar-range loop presets, A/B loop markers, speed-up-each-loop trainer.
+- Bar-range loop presets, A/B loop markers (practice mode already has a speed-up trainer).
+- Practice mode next: progress tracking (log/stats), guitar exercises, shared practice over jam sync, ear training.
 - Mobile layout polish, PWA install.
