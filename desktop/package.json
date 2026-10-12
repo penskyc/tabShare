@@ -1,7 +1,7 @@
 {
   "name": "tabshare-desktop",
   "productName": "tabShare",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "description": "tabShare desktop: connects to a tabShare server, with a low-latency ASIO / Core Audio amp engine and VST3 hosting.",
   "author": "Corey Pensky",
   "private": true,
