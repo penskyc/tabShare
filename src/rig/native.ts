@@ -63,6 +63,8 @@ interface NativeBridge {
   onAppFocus?(cb: (focused: boolean) => void): () => void;
   /** Desktop 0.3+: the connect window (server URL, API key, extra headers). */
   openServerSettings?(): void;
+  /** Desktop 0.3.2+: Browser mode can embed any site with <webview>. */
+  webview?: boolean;
 }
 
 export const native = (window as unknown as { tabshareNative?: NativeBridge }).tabshareNative ?? null;

@@ -15,12 +15,14 @@ import { Tuner } from './Tuner';
 import { setAudioSession } from './audioSession';
 import { Fretboard } from './Fretboard';
 import { Practice } from './Practice';
+import { Browser } from './Browser';
 import { lightOnly, setSoundBank, SOUND_BANKS, useSoundBank, type SoundBankId } from './soundfont';
 import { setScoreDark, useScoreDark } from './scoreTheme';
 import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from './OriginalAudio';
 import { playOrder } from '../shared/sync';
 
 const PLAYING = 1; // alphaTab.synth.PlayerState.Playing
+type Mode = 'tab' | 'practice' | 'browser';
 
 function readPref(k: string) {
   try {
@@ -128,8 +130,15 @@ export function Room({ session, profile, onLeave }: Props) {
   useEffect(() => setAudioSession(call.inCall || rig.on || showTuner), [call.inCall, rig.on, showTuner]);
   const [showFretboard, setShowFretboard] = useState(() => readPref('fretboard.open') === '1');
   // Tab | Practice. Practice is solo with its own player; the room's tab stays loaded but paused and muted.
-  const [mode, setMode] = useState<'tab' | 'practice'>(() => (readPref('practice.mode') === 'practice' ? 'practice' : 'tab'));
-  const switchMode = (m: 'tab' | 'practice') => {
+  // Browser: the room's shared web page; the tab keeps playing underneath (only Practice pauses it).
+  const [mode, setMode] = useState<Mode>(() => {
+    const m = readPref('practice.mode');
+    return m === 'practice' || m === 'browser' ? m : 'tab';
+  });
+  // Mounted on first visit and kept, so the page (scroll, history) is still there when you come back.
+  const [browserOpened, setBrowserOpened] = useState(mode === 'browser');
+  const switchMode = (m: Mode) => {
+    if (m === 'browser') setBrowserOpened(true);
     setMode(m);
     writePref('practice.mode', m);
   };
@@ -895,9 +904,12 @@ export function Room({ session, profile, onLeave }: Props) {
             <button className={mode === 'practice' ? 'on' : ''} onClick={() => switchMode('practice')}>
               Practice
             </button>
+            <button className={mode === 'browser' ? 'on' : ''} onClick={() => switchMode('browser')}>
+              Browser
+            </button>
           </div>
         </div>
-        <div className={`tab-view ${mode === 'practice' ? 'off' : ''}`} aria-hidden={mode === 'practice'}>
+        <div className={`tab-view ${mode !== 'tab' ? 'off' : ''}`} aria-hidden={mode !== 'tab'}>
           {error && <div className="banner error">{error}</div>}
           {score && (
             <div className="song-head">
@@ -948,10 +960,15 @@ export function Room({ session, profile, onLeave }: Props) {
           {showFretboard && <Fretboard api={api} score={score} />}
         </div>
         {mode === 'practice' && <Practice tunerOn={showTuner} onToggleTuner={() => setShowTuner((v) => !v)} />}
+        {browserOpened && (
+          <div className={`browser-wrap ${mode === 'browser' ? '' : 'off'}`} aria-hidden={mode !== 'browser'}>
+            <Browser room={room} />
+          </div>
+        )}
       </main>
       {showTuner && <Tuner rig={rig} onClose={() => setShowTuner(false)} />}
 
-      {mode === 'tab' && (
+      {mode !== 'practice' && (
         <footer className="transport">
           <div className="tp-group">
             <button className="tp-btn" onClick={stop} disabled={!ready} title="Stop">

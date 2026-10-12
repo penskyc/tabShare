@@ -52,6 +52,13 @@ export interface TransportState {
   by: string;
 }
 
+/** The room's shared browser page (Browser mode): always shared, live-only. */
+export interface BrowseState {
+  url: string;
+  by: string;
+  at: number;
+}
+
 /** Shared in jam mode: which tracks are shown, muted and soloed (track indexes), plus metronome and count-in. */
 export interface MixState {
   tracks: number[];
@@ -113,6 +120,7 @@ export interface RoomSnapshot {
   loop: LoopState | null;
   transport: TransportState | null;
   mix: MixState | null;
+  browse: BrowseState | null;
   chat: ChatMessage[];
 }
 
@@ -125,6 +133,7 @@ export type ClientMessage =
   | { type: 'setLoop'; loop: TickRange | null }
   | { type: 'transport'; playing: boolean; timeMs: number; speed: number }
   | ({ type: 'mix' } & Omit<MixState, 'by'>)
+  | { type: 'browse'; url: string }
   | { type: 'chat'; text: string }
   /** WebRTC signaling (SDP / ICE), relayed to one peer in the same room. */
   | { type: 'rtc'; to: string; data: unknown }
@@ -140,11 +149,24 @@ export type ServerMessage =
   | { type: 'loop'; loop: LoopState | null }
   | { type: 'transport'; transport: TransportState }
   | { type: 'mix'; mix: MixState }
+  | { type: 'browse'; browse: BrowseState | null }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'chatPreview'; id: string; preview: LinkPreview }
   | { type: 'rtc'; from: string; data: unknown }
   | { type: 'pong'; t: number; server: number }
   | { type: 'error'; message: string };
+
+/** A URL the shared browser may open: http(s), no credentials, at most 2048 characters. Null otherwise. */
+export function browseUrl(u: unknown): string | null {
+  if (typeof u !== 'string' || u.length > 2048) return null;
+  try {
+    const url = new URL(u);
+    if ((url.protocol !== 'http:' && url.protocol !== 'https:') || url.username || url.password) return null;
+    return url.href;
+  } catch {
+    return null;
+  }
+}
 
 /** First http(s) link in a chat message; trailing punctuation is not part of the link. */
 export const URL_RE = /https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]]/i;

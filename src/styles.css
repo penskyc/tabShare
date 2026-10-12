@@ -506,3 +506,19 @@ body.call-window > div { height: 100%; }
 .sound-bank { display: flex; gap: 8px; align-items: center; margin: 0 0 10px; }
 .sound-bank select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 4px 6px; color: var(--text); font-size: 12px; flex: 1; min-width: 0; }
 .score-paper.dark { background: #1a1a22; color: var(--text); }
+
+/* ---------- browser mode ---------- */
+.browser-wrap { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.browser-wrap.off { position: absolute; inset: 0; visibility: hidden; pointer-events: none; }
+.browser { flex: 1; display: flex; flex-direction: column; min-height: 0; }
+.browser-bar { display: flex; gap: 8px; align-items: center; padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.browser-bar input.grow { flex: 1; min-width: 160px; background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 7px 10px; color: var(--text); }
+.browser-bar .check-line { margin: 0; }
+.browser-nav { display: inline-flex; gap: 4px; }
+.browser-nav button { width: 32px; height: 32px; border-radius: 8px; border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.browser-who { padding: 4px 16px; background: var(--bg); }
+.browser-start { display: flex; gap: 8px; flex-wrap: wrap; padding: 16px; }
+.browser-view { flex: 1; display: flex; border: 0; background: #fff; }
+.browser-card { margin: 24px 16px; padding: 18px; border: 1px solid var(--line); border-radius: 12px; background: var(--bg-2); display: grid; gap: 10px; justify-items: start; max-width: 640px; }
+.browser-host { font-weight: 700; font-size: 18px; }
+.browser-url { word-break: break-all; }

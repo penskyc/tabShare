@@ -14,6 +14,10 @@ let APP_URL = '';
 let APP_ORIGIN = '';
 // Popups the app opens itself (TONE3000 sign-in) must keep window.opener for the OAuth relay.
 const popupOrigins = () => [APP_ORIGIN, 'https://www.tone3000.com', 'https://tone3000.com'];
+// Browser mode's embedded pages: their own cookie jar (never the app's session, so the server API key isn't sent)
+// and no camera/mic/screen. The page asks for it with <webview>; will-attach-webview forces these settings.
+const BROWSER_PARTITION = 'persist:tabshare-browser';
+const isWeb = (url) => /^https?:///i.test(url);
 const serverFile = () => path.join(app.getPath('userData'), 'server.json');
 
 /** Saved with the OS keychain (safeStorage) when available: the key and headers like CF-Access-Client-Secret are secrets. */
@@ -218,8 +222,16 @@ function createWindow() {
     height: 900,
     title: 'tabShare',
     autoHideMenuBar: true,
-    webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true },
+    webPreferences: { preload: path.join(here, 'preload.cjs'), contextIsolation: true, sandbox: true, webviewTag: true },
   }));
+  // The page is remote content, so it doesn't get to choose how an embedded page runs: no preload, no Node, sandboxed,
+  // in the browser partition, http(s) only.
+  win.webContents.on('will-attach-webview', (e, prefs, params) => {
+    if (!isWeb(params.src) && params.src !== 'about:blank') return e.preventDefault();
+    delete prefs.preload;
+    Object.assign(prefs, { nodeIntegration: false, nodeIntegrationInSubFrames: false, contextIsolation: true, sandbox: true, webSecurity: true });
+    params.partition = BROWSER_PARTITION;
+  });
   win.webContents.setWindowOpenHandler(({ url, frameName }) => {
     if (url === 'about:blank' && CALL_WINDOWS[frameName]) return { action: 'allow', overrideBrowserWindowOptions: CALL_WINDOWS[frameName]() };
     if (popupOrigins().includes(originOf(url))) return { action: 'allow' };
@@ -270,6 +282,22 @@ app.whenReady().then(async () => {
     cb(source ? { video: source } : {});
   });
   ipcMain.on('app-origin', (e) => (e.returnValue = APP_ORIGIN));
+  const browserSession = session.fromPartition(BROWSER_PARTITION);
+  browserSession.setPermissionRequestHandler((_wc, perm, cb) => cb(perm === 'fullscreen' || perm === 'clipboard-sanitized-write'));
+  browserSession.setPermissionCheckHandler((_wc, perm) => perm === 'fullscreen' || perm === 'clipboard-sanitized-write');
+  // Inside an embedded page: links that open new windows load in place; non-web links (mailto:) go to the OS.
+  app.on('web-contents-created', (_e, wc) => {
+    if (wc.getType() !== 'webview') return;
+    wc.setWindowOpenHandler(({ url }) => {
+      if (isWeb(url)) wc.loadURL(url);
+      return { action: 'deny' };
+    });
+    wc.on('will-navigate', (ev, url) => {
+      if (isWeb(url)) return;
+      ev.preventDefault();
+      if (/^(mailto|tel):/i.test(url)) shell.openExternal(url);
+    });
+  });
   session.defaultSession.webRequest.onBeforeSendHeaders((details, cb) => {
     if (server && isServerUrl(details.url)) Object.assign(details.requestHeaders, authHeaders(server));
     cb({ requestHeaders: details.requestHeaders });

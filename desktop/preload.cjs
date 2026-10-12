@@ -18,6 +18,8 @@ if (location.origin === ipcRenderer.sendSync('app-origin')) {
 
   contextBridge.exposeInMainWorld('tabshareNative', {
     platform: process.platform,
+    /** Browser mode can embed any site (<webview>); older apps don't have this. */
+    webview: true,
     send: (msg) => (port ? port.postMessage(msg) : queue.push(msg)),
     /** cb(false) when focus leaves every tabShare window, cb(true) when the main window gets it back. */
     onAppFocus: (cb) => {

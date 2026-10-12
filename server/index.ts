@@ -5,7 +5,9 @@ import express, { type Request, type Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   ALLOWED_EXTENSIONS,
+  browseUrl,
   MAX_UPLOAD_BYTES,
+  type BrowseState,
   type ChatMessage,
   type ClientMessage,
   type MixState,
@@ -97,13 +99,14 @@ interface LiveRoom {
   clients: Map<string, Client>;
   transport: TransportState | null;
   mix: MixState | null;
+  browse: BrowseState | null;
 }
 
 const live = new Map<string, LiveRoom>();
 function liveRoom(id: string) {
   let r = live.get(id);
   if (!r) {
-    r = { clients: new Map(), transport: null, mix: null };
+    r = { clients: new Map(), transport: null, mix: null, browse: null };
     live.set(id, r);
   }
   return r;
@@ -439,6 +442,7 @@ wss.on('connection', (ws, req) => {
           loop: room.loop,
           transport: lr.transport,
           mix: lr.mix,
+          browse: lr.browse,
           chat: room.chat.slice(-100),
         },
         peers: [...lr.clients.values()].filter((c) => c.peer.clientId !== clientId).map((c) => c.peer),
@@ -501,6 +505,13 @@ wss.on('connection', (ws, req) => {
             : null;
         saveSoon();
         broadcast(room.id, { type: 'loop', loop: room.loop });
+        break;
+      }
+      case 'browse': {
+        const url = browseUrl(msg.url);
+        if (!url) break;
+        lr.browse = { url, by: me.peer.name, at: Date.now() };
+        broadcast(room.id, { type: 'browse', browse: lr.browse }, clientId);
         break;
       }
       case 'transport': {

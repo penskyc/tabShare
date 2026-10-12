@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
+  BrowseState,
   ChatMessage,
   ClientMessage,
   LoopState,
@@ -27,6 +28,8 @@ export interface RoomConnection {
   loop: LoopState | null;
   transport: TransportState | null;
   mix: MixState | null;
+  /** The room's shared browser page (Browser mode). */
+  browse: BrowseState | null;
   chat: ChatMessage[];
   peers: Record<string, Peer>;
   /** serverTime ≈ Date.now() + clockOffset */
@@ -37,6 +40,7 @@ export interface RoomConnection {
   setLoop: (loop: TickRange | null) => void;
   sendTransport: (playing: boolean, timeMs: number, speed: number) => void;
   sendMix: (mix: Omit<MixState, 'by'>) => void;
+  sendBrowse: (url: string) => void;
   sendChat: (text: string) => void;
   sendRtc: (to: string, data: unknown) => void;
   /** Subscribe to WebRTC signaling messages; returns an unsubscribe function. */
@@ -56,6 +60,7 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
   const [loop, setLoopState] = useState<LoopState | null>(null);
   const [transport, setTransport] = useState<TransportState | null>(null);
   const [mix, setMix] = useState<MixState | null>(null);
+  const [browse, setBrowse] = useState<BrowseState | null>(null);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [peers, setPeers] = useState<Record<string, Peer>>({});
   const [clockOffset, setClockOffset] = useState(0);
@@ -121,6 +126,7 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
             setLoopState(m.room.loop);
             setTransport(m.room.transport);
             setMix(m.room.mix);
+            setBrowse(m.room.browse ?? null);
             setChat(m.room.chat);
             setPeers(Object.fromEntries(m.peers.map((p) => [p.clientId, p])));
             if (Object.keys(localPresence.current).length) {
@@ -162,6 +168,9 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
             break;
           case 'mix':
             setMix(m.mix);
+            break;
+          case 'browse':
+            setBrowse(m.browse);
             break;
           case 'chat':
             setChat((c) => [...c.slice(-199), m.message]);
@@ -220,6 +229,7 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
     loop,
     transport,
     mix,
+    browse,
     chat,
     peers,
     clockOffset,
@@ -236,6 +246,13 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
       [raw],
     ),
     sendMix: useCallback((mix: Omit<MixState, 'by'>) => raw({ type: 'mix', ...mix }), [raw]),
+    sendBrowse: useCallback(
+      (url: string) => {
+        setBrowse({ url, by: profile.name, at: Date.now() });
+        raw({ type: 'browse', url });
+      },
+      [raw, profile.name],
+    ),
     sendChat: useCallback((text: string) => raw({ type: 'chat', text }), [raw]),
     sendTabVideo: useCallback((tabId: string, youtube: TabVideo | null) => raw({ type: 'tabVideo', tabId, youtube }), [raw]),
     sendRtc: useCallback((to: string, data: unknown) => raw({ type: 'rtc', to, data }), [raw]),
