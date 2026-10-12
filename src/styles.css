@@ -310,11 +310,14 @@ textarea { font-family: var(--mono); font-size: 12.5px; resize: vertical; }
 /* ---------- small screens and touch-only devices (phones, iPads): side panel as a drawer, one-row transport ---------- */
 .menu-btn { display: none; }
 @media (max-width: 860px), (max-height: 500px), (hover: none) and (pointer: coarse) {
-  .room { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto; grid-template-areas: 'head' 'stage' 'foot'; }
+  /* minmax(0, …): a plain 1fr column grows to the header's content width (avatars + buttons) and pushes the page sideways. */
+  .room { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto; grid-template-areas: 'head' 'stage' 'foot'; }
   .room-head { gap: 8px; padding: 6px 10px; min-height: 52px; }
   .menu-btn { display: inline-flex; padding: 6px 12px; font-size: 18px; }
   .room-head .btn { padding: 6px 10px; }
-  .peers { min-width: 0; overflow: hidden; }
+  .peers { min-width: 0; overflow: hidden; gap: 0; }
+  .peer + .peer { margin-left: -8px; } /* stacked avatars, so the room name keeps some room */
+  .room-title { min-width: 72px; }
   .side-resize { display: none; }
   .side {
     position: fixed; z-index: 40; top: 0; bottom: 0; left: 0; width: min(380px, 88vw);
