@@ -1,4 +1,5 @@
 // Wire protocol shared by the server and the client.
+import type { DrumSong } from './drums';
 
 /** Pins a bar (playback occurrence + position within the bar) to a time in the linked video. Same shape as alphaTab's FlatSyncPoint. */
 export interface SyncPoint {
@@ -55,6 +56,27 @@ export interface TransportState {
 /** The room's shared browser page (Browser mode): always shared, live-only. */
 export interface BrowseState {
   url: string;
+  by: string;
+  at: number;
+}
+
+/** Drums mode shared with the room: the song (seeds, so every client generates the same part) and where it is. */
+export interface DrumShare {
+  song: DrumSong;
+  playing: boolean;
+  /** Position in ms at server time `at`. */
+  timeMs: number;
+  at: number;
+  /** Index of the section being looped, or null for the whole song. */
+  loop: number | null;
+  by: string;
+}
+
+/** A drum song saved to the room. */
+export interface SavedDrumSong {
+  id: string;
+  name: string;
+  song: DrumSong;
   by: string;
   at: number;
 }
@@ -121,6 +143,8 @@ export interface RoomSnapshot {
   transport: TransportState | null;
   mix: MixState | null;
   browse: BrowseState | null;
+  drums: DrumShare | null;
+  drumSongs: SavedDrumSong[];
   chat: ChatMessage[];
 }
 
@@ -134,6 +158,9 @@ export type ClientMessage =
   | { type: 'transport'; playing: boolean; timeMs: number; speed: number }
   | ({ type: 'mix' } & Omit<MixState, 'by'>)
   | { type: 'browse'; url: string }
+  | { type: 'drums'; state: Omit<DrumShare, 'at' | 'by'> | null }
+  | { type: 'saveDrums'; name: string; song: DrumSong }
+  | { type: 'deleteDrums'; id: string }
   | { type: 'chat'; text: string }
   /** WebRTC signaling (SDP / ICE), relayed to one peer in the same room. */
   | { type: 'rtc'; to: string; data: unknown }
@@ -150,6 +177,8 @@ export type ServerMessage =
   | { type: 'transport'; transport: TransportState }
   | { type: 'mix'; mix: MixState }
   | { type: 'browse'; browse: BrowseState | null }
+  | { type: 'drums'; state: DrumShare | null }
+  | { type: 'drumSongs'; songs: SavedDrumSong[] }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'chatPreview'; id: string; preview: LinkPreview }
   | { type: 'rtc'; from: string; data: unknown }

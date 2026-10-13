@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { ChatMessage, LoopState, TabMeta } from '../shared/protocol.js';
+import type { ChatMessage, LoopState, SavedDrumSong, TabMeta } from '../shared/protocol.js';
 
 export const DATA_DIR = path.resolve(process.env.DATA_DIR ?? 'data');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
@@ -18,6 +18,8 @@ export interface StoredRoom {
   currentTabId: string | null;
   loop: LoopState | null;
   chat: ChatMessage[];
+  /** Drums mode songs saved to the room (≤ 50). */
+  drumSongs?: SavedDrumSong[];
 }
 
 fs.mkdirSync(FILES_DIR, { recursive: true });

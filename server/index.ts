@@ -8,6 +8,7 @@ import {
   browseUrl,
   MAX_UPLOAD_BYTES,
   type BrowseState,
+  type DrumShare,
   type ChatMessage,
   type ClientMessage,
   type MixState,
@@ -16,6 +17,7 @@ import {
   type TabMeta,
   type TransportState,
 } from '../shared/protocol.js';
+import { drumSong } from '../shared/drums.js';
 import {
   checkPassword,
   createRoom,
@@ -100,13 +102,14 @@ interface LiveRoom {
   transport: TransportState | null;
   mix: MixState | null;
   browse: BrowseState | null;
+  drums: DrumShare | null;
 }
 
 const live = new Map<string, LiveRoom>();
 function liveRoom(id: string) {
   let r = live.get(id);
   if (!r) {
-    r = { clients: new Map(), transport: null, mix: null, browse: null };
+    r = { clients: new Map(), transport: null, mix: null, browse: null, drums: null };
     live.set(id, r);
   }
   return r;
@@ -443,6 +446,8 @@ wss.on('connection', (ws, req) => {
           transport: lr.transport,
           mix: lr.mix,
           browse: lr.browse,
+          drums: lr.drums,
+          drumSongs: room.drumSongs ?? [],
           chat: room.chat.slice(-100),
         },
         peers: [...lr.clients.values()].filter((c) => c.peer.clientId !== clientId).map((c) => c.peer),
@@ -512,6 +517,35 @@ wss.on('connection', (ws, req) => {
         if (!url) break;
         lr.browse = { url, by: me.peer.name, at: Date.now() };
         broadcast(room.id, { type: 'browse', browse: lr.browse }, clientId);
+        break;
+      }
+      case 'drums': {
+        const st = msg.state;
+        if (!st) {
+          lr.drums = null;
+        } else {
+          const song = drumSong(st.song);
+          if (!song) break;
+          const loop = Number.isInteger(st.loop) && st.loop! >= 0 && st.loop! < song.sections.length ? st.loop : null;
+          lr.drums = { song, playing: st.playing === true, timeMs: Math.max(0, Number(st.timeMs) || 0), loop, at: Date.now(), by: me.peer.name };
+        }
+        broadcast(room.id, { type: 'drums', state: lr.drums }, clientId);
+        break;
+      }
+      case 'saveDrums': {
+        const song = drumSong(msg.song);
+        if (!song) break;
+        const entry = { id: randomCode(10), name: str(msg.name, 60) || 'Drum song', song, by: me.peer.name, at: Date.now() };
+        room.drumSongs = [...(room.drumSongs ?? []), entry].slice(-50);
+        saveSoon();
+        broadcast(room.id, { type: 'drumSongs', songs: room.drumSongs });
+        break;
+      }
+      case 'deleteDrums': {
+        if (!room.drumSongs?.some((s) => s.id === msg.id)) break;
+        room.drumSongs = room.drumSongs.filter((s) => s.id !== msg.id);
+        saveSoon();
+        broadcast(room.id, { type: 'drumSongs', songs: room.drumSongs });
         break;
       }
       case 'transport': {

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
   BrowseState,
+  DrumShare,
+  SavedDrumSong,
   ChatMessage,
   ClientMessage,
   LoopState,
@@ -30,6 +32,9 @@ export interface RoomConnection {
   mix: MixState | null;
   /** The room's shared browser page (Browser mode). */
   browse: BrowseState | null;
+  /** Drums mode shared with the room, and the room's saved drum songs. */
+  drums: DrumShare | null;
+  drumSongs: SavedDrumSong[];
   chat: ChatMessage[];
   peers: Record<string, Peer>;
   /** serverTime ≈ Date.now() + clockOffset */
@@ -41,6 +46,9 @@ export interface RoomConnection {
   sendTransport: (playing: boolean, timeMs: number, speed: number) => void;
   sendMix: (mix: Omit<MixState, 'by'>) => void;
   sendBrowse: (url: string) => void;
+  sendDrums: (state: Omit<DrumShare, 'at' | 'by'> | null) => void;
+  saveDrums: (name: string, song: DrumShare['song']) => void;
+  deleteDrums: (id: string) => void;
   sendChat: (text: string) => void;
   sendRtc: (to: string, data: unknown) => void;
   /** Subscribe to WebRTC signaling messages; returns an unsubscribe function. */
@@ -61,6 +69,8 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
   const [transport, setTransport] = useState<TransportState | null>(null);
   const [mix, setMix] = useState<MixState | null>(null);
   const [browse, setBrowse] = useState<BrowseState | null>(null);
+  const [drums, setDrums] = useState<DrumShare | null>(null);
+  const [drumSongs, setDrumSongs] = useState<SavedDrumSong[]>([]);
   const [chat, setChat] = useState<ChatMessage[]>([]);
   const [peers, setPeers] = useState<Record<string, Peer>>({});
   const [clockOffset, setClockOffset] = useState(0);
@@ -127,6 +137,8 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
             setTransport(m.room.transport);
             setMix(m.room.mix);
             setBrowse(m.room.browse ?? null);
+            setDrums(m.room.drums ?? null);
+            setDrumSongs(m.room.drumSongs ?? []);
             setChat(m.room.chat);
             setPeers(Object.fromEntries(m.peers.map((p) => [p.clientId, p])));
             if (Object.keys(localPresence.current).length) {
@@ -171,6 +183,12 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
             break;
           case 'browse':
             setBrowse(m.browse);
+            break;
+          case 'drums':
+            setDrums(m.state);
+            break;
+          case 'drumSongs':
+            setDrumSongs(m.songs);
             break;
           case 'chat':
             setChat((c) => [...c.slice(-199), m.message]);
@@ -230,6 +248,8 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
     transport,
     mix,
     browse,
+    drums,
+    drumSongs,
     chat,
     peers,
     clockOffset,
@@ -246,6 +266,9 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
       [raw],
     ),
     sendMix: useCallback((mix: Omit<MixState, 'by'>) => raw({ type: 'mix', ...mix }), [raw]),
+    sendDrums: useCallback((state: Omit<DrumShare, 'at' | 'by'> | null) => raw({ type: 'drums', state }), [raw]),
+    saveDrums: useCallback((name: string, song: DrumShare['song']) => raw({ type: 'saveDrums', name, song }), [raw]),
+    deleteDrums: useCallback((id: string) => raw({ type: 'deleteDrums', id }), [raw]),
     sendBrowse: useCallback(
       (url: string) => {
         setBrowse({ url, by: profile.name, at: Date.now() });
