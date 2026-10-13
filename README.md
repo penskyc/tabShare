@@ -18,6 +18,10 @@ rig in the same room. Think Songsterr / Guitar Pro, multiplayer, on your own ser
   `.nam` files or browsed from TONE3000), cab IRs, and VST3 plugins (desktop app), sent straight into the call.
 - **Desktop app** (Windows, macOS Apple Silicon and Intel): the same rooms, with a native **ASIO / Core Audio** engine for
   low-latency monitoring (about 5–25 ms instead of the browser's 50–70 ms) and VST3 hosting. Updates itself.
+- **Room audio** (desktop app): everyone in the room with the app hears each other's instruments directly, peer to
+  peer, using [SonoBus](https://sonobus.net)'s networking (AOO) and its public connection server, separate from the
+  call and with SonoBus-level latency. Per-person volume and jitter buffer, Opus or uncompressed PCM. Web and iPhone
+  users still get the instruments through the call.
 
 Rooms are private: the admin creates them, people join with a link and the room password.
 
@@ -113,7 +117,12 @@ The key and headers are stored encrypted with the OS keychain and are sent only 
 restarting.
 
 Windows: the installer isn't code-signed, so SmartScreen asks once (*More info → Run anyway*). Audio interfaces need an
-ASIO driver (or ASIO4ALL). macOS asks for microphone, camera and (for screen sharing) screen-recording permission.
+ASIO driver (or ASIO4ALL). The app only loads the ASIO driver you pick: wrapper drivers like ASIO4ALL take over every
+Windows audio device when loaded, including a USB call mic.
+
+Room audio connects through `aoo.sonobus.net` (TCP + UDP port 10998) to find the other players, then sends audio
+directly between them. Like SonoBus, the audio isn't encrypted: the room's group password keeps others out of the
+group, not off the wire. If two players can't connect directly (strict NAT), they hear each other through the call. macOS asks for microphone, camera and (for screen sharing) screen-recording permission.
 
 ## Develop
 
@@ -142,6 +151,9 @@ tabShare stands on a lot of other people's work. Thank you.
   [nam-wasm](https://github.com/andremichelle/nam-wasm) by André Michelle (MIT).
 - [songsterr-downloader](https://github.com/Metaphysics0/songsterr-downloader) by Ryan Roberts: the Songsterr JSON → Guitar Pro converter in `server/songsterr/` (MIT).
 - [RtAudio](https://github.com/thestk/rtaudio) by Gary P. Scavone (MIT-style), via [audify](https://github.com/almoghamdani/audify) by Almog Hamdani (MIT): ASIO / Core Audio I/O.
+- [SonoBus](https://github.com/sonosaurus/sonobus) by Jesse Chappell (GPLv3): room audio follows its peer handshake,
+  formats and jitter-buffer logic, and uses its public connection server; [AOO (Audio over OSC)](https://github.com/essej/aoo)
+  by Christof Ressi, Winfried Ritsch and others (BSD), SonoBus's fork; [Opus](https://opus-codec.org) by Xiph.Org (BSD).
 - [JUCE](https://juce.com) by Raw Material Software (AGPLv3): VST3 plugin hosting, including Steinberg's VST3 SDK (MIT).
 - [fflate](https://github.com/101arrowz/fflate) by Arjun Barrett (MIT).
 
@@ -154,7 +166,7 @@ tabShare stands on a lot of other people's work. Thank you.
 
 **Fonts** (SIL OFL 1.1, via Google Fonts): [Space Grotesk](https://github.com/floriankarsten/space-grotesk) by Florian Karsten, [JetBrains Mono](https://www.jetbrains.com/lp/mono/), [Instrument Serif](https://github.com/Instrument/instrument-serif).
 
-**Services it talks to:** [Songsterr](https://www.songsterr.com) (tab search and data), [TONE3000](https://www.tone3000.com) (amp captures), [YouTube](https://www.youtube.com) IFrame Player API (original recordings), and Cloudflare / Google public STUN servers (calls). tabShare isn't affiliated with any of them; respect their terms.
+**Services it talks to:** [Songsterr](https://www.songsterr.com) (tab search and data), [TONE3000](https://www.tone3000.com) (amp captures), [YouTube](https://www.youtube.com) IFrame Player API (original recordings), SonoBus's connection server (room audio), and Cloudflare / Google public STUN servers (calls). tabShare isn't affiliated with any of them; respect their terms.
 
 ## License
 

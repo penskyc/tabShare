@@ -9,7 +9,8 @@ drag-drop, in-app alphaTex editor, **Songsterr search + one-click import**) rend
 speed, metronome, count-in, per-track view/mute/solo/volume; shared loops; **jam sync** (on by default) that syncs
 play/pause/seek/speed plus the whole mix (tracks, mute, solo, volume, metronome, count-in, Synth/Original);
 **Original audio**: a YouTube recording per tab with tap-to-sync bar points; chat with clickable links + Open Graph
-previews; mesh WebRTC **video/voice call** (device pickers, mute, camera, screen share, "original sound"); **instrument
+previews; mesh WebRTC **video/voice call** (device pickers, mute, camera, screen share, "original sound"); **room audio**
+(desktop apps hear each other's instruments peer to peer via SonoBus's networking); **instrument
 rig**: audio-interface input → NAM amp model (WASM) → cab IR → monitor + mixed into the call, with local `.nam` files or
 **TONE3000** browsing and a capture dropdown; resizable/collapsible side panel; `#/admin` room management; a **desktop app** (`desktop/`, Electron, Windows +
 macOS) that loads the live site and runs the rig through a native **ASIO** (Windows) / **Core Audio** (macOS) engine.
@@ -54,6 +55,21 @@ macOS) that loads the live site and runs the rig through a native **ASIO** (Wind
 - `src/Browser.tsx`: **Browser mode** (fourth switch, after Drums). One shared page per room: `room.browse` (`BrowseState`, live-only like transport; `browse` WS message, URL checked by `browseUrl()` in shared/protocol.ts: http(s), no credentials, ≤ 2048). Desktop app 0.3.2+ (`native.webview`) embeds it with Electron `<webview>` (sites that refuse iframes still load); main.js `will-attach-webview` forces no preload / no Node / sandbox / partition `persist:tabshare-browser` (its own cookies, so the server API key header never reaches it; no camera/mic; pop-ups load in place). **Keep the app's own user agent for embedded pages**: a rewritten "plain Chrome" UA fails Cloudflare Turnstile (header and JS UA disagree; Reverb sign-in). "Browse together" (`tabshare.browser.follow`, default on): your navigations are shared and others' move you. Elsewhere (web, iOS, older apps) the shared URL is a card with Open + a box to share a link. The tab keeps playing in Browser mode (only Practice and Drums pause/mute it); the Browser view stays mounted once opened. Test: `.playwright-mcp/browser-test.mjs` (Electron + Chrome).
 - Phone/tablet layout: the side panel becomes a drawer (☰) at `(max-width: 860px), (max-height: 500px), (hover: none) and (pointer: coarse)` (phones in any orientation, every iPad), in `styles.css` and `useNarrow` (Room.tsx); the compact header (icon-only buttons) is only for small screens.
 - `mobile/`: iPhone/iPad app (Expo SDK 57, local Xcode builds, TestFlight). WebView of the server + `window.tabshareNative` bridge (`src/bridge.ts`) to a native rig (`modules/tabshare-audio`: RemoteIO + NeuralAmpModelerCore). iOS has one input device, so with the rig on the call's voice comes from an interface input (`voice` stream replaces the mic in `useCall`). See `mobile/README.md`.
+- **Room audio** (desktop 0.4+): `desktop/native/net/` → `tabshare_net.node` (JUCE-free N-API): SonoBus's AOO fork
+  (`essej/aoo@9960da7`, BSD) + Opus 1.5.2 via CMake FetchContent. `room.cpp` = one UDP socket, threads recv/send/events/
+  client, SonoBus's handshake (dummy source 0, per peer sink+source with the same id, re-invite on SOURCE_ADD), `/sb/ping`
+  RTT, AutoFull jitter buffer, safety mute for new peers. Server `aoo.sonobus.net:10998` is fixed in engine.mjs (not from
+  the page). Group = `audioCredentials(room)` (server/store.ts, HMAC; password rotates with the room password), sent in
+  `welcome.audio`. AOO user = `ts-<clientId>-<4>`. Engine: rig callback `net.process(y, out)`; rig off + Hear the room
+  + someone linked → output-only stream. Page: `src/rig/useRoomAudio.ts` + `RoomAudio.tsx` (Rig panel), call skips the
+  instrument of linked peers. **Gotcha: AOO plays Opus sharp/gappy when the audio block > the Opus frame**, so the frame is
+  the smallest 120·2^k ≥ block (128 → 240). Spec/brief/plan in `docs/superpowers/`. Tests: `desktop/native/net.test.mjs`
+  (local AOO server; `NET_LIVE=1` = aoo.sonobus.net), `.playwright-mcp/room-audio-e2e.mjs` (app + bot member).
+- **ASIO driver loading** (Windows): RtAudio's device listing loads every installed ASIO driver, and wrapper drivers
+  (ASIO4ALL, FL Studio ASIO) take over Windows audio devices: a USB call mic went silent for good. `desktop/scripts/
+  patch-audify.mjs` (run by `npm run build:native`) rebuilds audify's RtAudio with a `TABSHARE_ASIO_ONLY` filter; the
+  engine lists names from the registry and loads only the picked driver (`devices` + `probe`). Probe:
+  `.playwright-mcp/asio4all-mic.mjs`.
 - `desktop/picker.html` + `picker-preload.cjs`: screen-share picker (thumbnails of screens + windows, tabShare's own windows excluded, screens labelled with resolution and "main").
 - `src/App.tsx`: hash routing (`#/r/<code>`, `#/admin`) and the lobby (create/join).
 - `src/Admin.tsx`: admin page (list rooms with who's online, change a room's password, delete a room).
