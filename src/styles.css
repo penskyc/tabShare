@@ -500,6 +500,20 @@ body.call-window > div { height: 100%; }
 .practice-transport { grid-area: auto; }
 .practice-small { width: 52px; }
 .practice-bar select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 8px; padding: 5px 8px; color: var(--text); font-size: 13px; }
+.drums-share { display: flex !important; align-items: center; gap: 6px; color: var(--text); align-self: center; }
+.drums-save { display: flex; gap: 6px; align-items: center; }
+.drums-save input { width: 150px; padding: 5px 8px; font-size: 13px; }
+.drums-arrangement { display: flex; gap: 6px; overflow-x: auto; flex-shrink: 0; padding: 8px 16px; border-bottom: 1px solid var(--line); background: var(--bg-2); }
+.drums-section { flex-shrink: 0; display: grid; grid-template-columns: auto auto; gap: 4px; padding: 6px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); font-size: 12px; }
+.drums-section.now { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+.drums-section.looped { background: color-mix(in srgb, var(--accent) 12%, var(--bg)); }
+.drums-section select { background: var(--bg-2); border: 1px solid var(--line); border-radius: 6px; padding: 3px 6px; color: var(--text); font-size: 12px; }
+.drums-section-tools { grid-column: 1 / -1; display: flex; justify-content: space-between; }
+.drums-section-tools button { background: none; border: 1px solid transparent; border-radius: 6px; color: var(--muted); padding: 2px 5px; cursor: pointer; font-size: 12px; }
+.drums-section-tools button:hover:not(:disabled) { border-color: var(--line); color: var(--text); }
+.drums-section-tools button.on { color: var(--accent); border-color: var(--accent); }
+.drums-section-tools button:disabled { opacity: 0.3; cursor: default; }
+.drums-add { align-self: center; flex-shrink: 0; }
 .check-line { display: flex; gap: 6px; align-items: center; margin: 0 0 8px; cursor: pointer; }
 .tab-only { background: var(--panel); border: 1px solid var(--line); border-radius: 8px; color: var(--muted); padding: 3px 8px; font: inherit; font-size: 12px; }
 .tab-only.on { color: var(--text); border-color: var(--accent); background: #2b1b14; }

@@ -15,6 +15,7 @@ import { Tuner } from './Tuner';
 import { setAudioSession } from './audioSession';
 import { Fretboard } from './Fretboard';
 import { Practice } from './Practice';
+import { Drums } from './Drums';
 import { Browser } from './Browser';
 import { arrowStep, step } from './barNav';
 import { lightOnly, setSoundBank, SOUND_BANKS, useSoundBank, type SoundBankId } from './soundfont';
@@ -23,7 +24,7 @@ import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from '.
 import { playOrder } from '../shared/sync';
 
 const PLAYING = 1; // alphaTab.synth.PlayerState.Playing
-type Mode = 'tab' | 'practice' | 'browser';
+type Mode = 'tab' | 'practice' | 'drums' | 'browser';
 
 function readPref(k: string) {
   try {
@@ -131,10 +132,11 @@ export function Room({ session, profile, onLeave }: Props) {
   useEffect(() => setAudioSession(call.inCall || rig.on || showTuner), [call.inCall, rig.on, showTuner]);
   const [showFretboard, setShowFretboard] = useState(() => readPref('fretboard.open') === '1');
   // Tab | Practice. Practice is solo with its own player; the room's tab stays loaded but paused and muted.
-  // Browser: the room's shared web page; the tab keeps playing underneath (only Practice pauses it).
+  // Drums: a generated drum song (solo or shared), also with its own player, so the tab pauses like Practice.
+  // Browser: the room's shared web page; the tab keeps playing underneath (only Practice/Drums pause it).
   const [mode, setMode] = useState<Mode>(() => {
     const m = readPref('practice.mode');
-    return m === 'practice' || m === 'browser' ? m : 'tab';
+    return m === 'practice' || m === 'drums' || m === 'browser' ? m : 'tab';
   });
   // Mounted on first visit and kept, so the page (scroll, history) is still there when you come back.
   const [browserOpened, setBrowserOpened] = useState(mode === 'browser');
@@ -485,15 +487,16 @@ export function Room({ session, profile, onLeave }: Props) {
 
   useEffect(() => {
     if (!api) return;
-    if (mode === 'practice') api.pause();
+    const solo = mode === 'practice' || mode === 'drums';
+    if (solo) api.pause();
     // Muted, not stopped: remote jam play/seek still moves the hidden tab, so coming back rejoins the jam.
-    api.masterVolume = mode === 'practice' ? 0 : 1;
+    api.masterVolume = solo ? 0 : 1;
   }, [api, mode]);
 
   // Space = play/pause; arrows = previous/next bar (← →) and row (↑ ↓). Not while typing; Practice has its own.
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (mode === 'practice') return;
+      if (mode === 'practice' || mode === 'drums') return;
       const arrow = mode === 'tab' ? arrowStep(e) : null;
       if (arrow && api && ready) {
         e.preventDefault();
@@ -912,6 +915,9 @@ export function Room({ session, profile, onLeave }: Props) {
             <button className={mode === 'practice' ? 'on' : ''} onClick={() => switchMode('practice')}>
               Practice
             </button>
+            <button className={mode === 'drums' ? 'on' : ''} onClick={() => switchMode('drums')}>
+              Drums
+            </button>
             <button className={mode === 'browser' ? 'on' : ''} onClick={() => switchMode('browser')}>
               Browser
             </button>
@@ -968,6 +974,7 @@ export function Room({ session, profile, onLeave }: Props) {
           {showFretboard && <Fretboard api={api} score={score} />}
         </div>
         {mode === 'practice' && <Practice tunerOn={showTuner} onToggleTuner={() => setShowTuner((v) => !v)} />}
+        {mode === 'drums' && <Drums room={room} tunerOn={showTuner} onToggleTuner={() => setShowTuner((v) => !v)} />}
         {browserOpened && (
           <div className={`browser-wrap ${mode === 'browser' ? '' : 'off'}`} aria-hidden={mode !== 'browser'}>
             <Browser room={room} />
@@ -976,7 +983,7 @@ export function Room({ session, profile, onLeave }: Props) {
       </main>
       {showTuner && <Tuner rig={rig} onClose={() => setShowTuner(false)} />}
 
-      {mode !== 'practice' && (
+      {mode !== 'practice' && mode !== 'drums' && (
         <footer className="transport">
           <div className="tp-group">
             <button className="tp-btn" onClick={stop} disabled={!ready} title="Stop">

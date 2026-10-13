@@ -413,7 +413,7 @@ export function drumsToAlphaTex(song: DrumSong, title: string): string {
     }
     const sec = sectionStartBars.indexOf(bi);
     const marker = sec >= 0 ? `\\section "${SECTION_LABELS[song.sections[sec].type]}" ` : '';
-    const tsMark = bi === 0 ? `\\ts ${ts === '4/4' ? '4 4' : '12 8'} ` : '';
+    const tsMark = bi === 0 ? `\\ts ${ts === '4/4' ? '4 4' : '12 8'} \\clef neutral ` : '';
     return `${tsMark}${marker}${beats.join(' ')}`;
   });
   return [`\\title "${title.replace(/"/g, "'")}"`, `\\tempo ${song.tempo}`, '\\track "Drums"', '\\instrument percussion', out.join(' | ') + ' |'].join('\n');

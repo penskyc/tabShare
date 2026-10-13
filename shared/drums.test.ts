@@ -54,6 +54,7 @@ test('alphaTex parses with the same notes, sections and time signature', () => {
       const score = parse(drumsToAlphaTex(song, 'Test'));
       const st = score.tracks[0].staves[0];
       assert.ok(st.isPercussion, style);
+      assert.equal(st.bars[0].clef, alphaTab.model.Clef.Neutral, `${style} percussion clef`);
       assert.equal(st.bars.length, b.bars.length, `${style} bar count`);
       const parsed = st.bars.flatMap((bar) => bar.voices[0].beats.flatMap((x) => x.notes)).length;
       const want = b.bars.flat(2).length;
