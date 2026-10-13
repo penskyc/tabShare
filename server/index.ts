@@ -25,6 +25,7 @@ import {
   deleteRoom,
   getRoom,
   issueToken,
+  audioCredentials,
   listRooms,
   randomCode,
   saveSoon,
@@ -451,6 +452,7 @@ wss.on('connection', (ws, req) => {
           chat: room.chat.slice(-100),
         },
         peers: [...lr.clients.values()].filter((c) => c.peer.clientId !== clientId).map((c) => c.peer),
+        audio: audioCredentials(room),
       });
       broadcast(room.id, { type: 'peerJoined', peer }, clientId);
       return;

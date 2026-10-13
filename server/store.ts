@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { createHmac, randomBytes, scryptSync, timingSafeEqual } from 'node:crypto';
-import type { ChatMessage, LoopState, SavedDrumSong, TabMeta } from '../shared/protocol.js';
+import type { ChatMessage, LoopState, RoomAudio, SavedDrumSong, TabMeta } from '../shared/protocol.js';
 
 export const DATA_DIR = path.resolve(process.env.DATA_DIR ?? 'data');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
@@ -131,6 +131,17 @@ export const hashSecret = hashPassword;
 /** Room tokens are bound to the password hash, so changing a room password invalidates them. */
 export function issueToken(room: StoredRoom) {
   return createHmac('sha256', secret).update(`${room.id}:${room.hash}`).digest('base64url');
+}
+
+/**
+ * The SonoBus group (on aoo.sonobus.net) the room's desktop apps join for instrument audio. Derived, not stored: the
+ * password is bound to the room password hash like room tokens, so a password change locks removed people out.
+ */
+export function audioCredentials(room: StoredRoom): RoomAudio {
+  return {
+    group: 'tabshare-' + createHmac('sha256', secret).update(`group:${room.id}`).digest('hex').slice(0, 16),
+    password: createHmac('sha256', secret).update(`audio:${room.id}:${room.hash}`).digest('base64url'),
+  };
 }
 
 export function verifyToken(room: StoredRoom | undefined, token: unknown): room is StoredRoom {

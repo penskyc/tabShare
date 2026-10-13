@@ -2,6 +2,12 @@
 import type { DrumSong } from './drums';
 
 /** Pins a bar (playback occurrence + position within the bar) to a time in the linked video. Same shape as alphaTab's FlatSyncPoint. */
+/** Desktop apps' instrument audio: the SonoBus group (aoo.sonobus.net) for this room. Only sent to joined members. */
+export interface RoomAudio {
+  group: string;
+  password: string;
+}
+
 export interface SyncPoint {
   barIndex: number;
   barOccurence: number;
@@ -167,7 +173,7 @@ export type ClientMessage =
   | { type: 'ping'; t: number };
 
 export type ServerMessage =
-  | { type: 'welcome'; clientId: string; room: RoomSnapshot; peers: Peer[] }
+  | { type: 'welcome'; clientId: string; room: RoomSnapshot; peers: Peer[]; audio?: RoomAudio }
   | { type: 'peerJoined'; peer: Peer }
   | { type: 'peerLeft'; clientId: string }
   | { type: 'presence'; clientId: string; presence: Partial<Presence> & { jam?: boolean } }
