@@ -201,10 +201,8 @@ export function ScoreView({ ref, data, ext, peers, onApi, onPointer, onSelection
       scrollToPeer(peer) {
         const el = scrollRef.current;
         if (!el || !layout) return;
-        let y: number | null = null;
-        if (peer.cursor) y = xyFromPoint(layout, peer.cursor)?.y ?? null;
-        if (y == null && peer.playTick != null) y = tickLine(layout, peer.playTick)?.y ?? null;
-        if (y != null) el.scrollTo({ top: Math.max(0, y - el.clientHeight / 3), behavior: 'smooth' });
+        const at = (peer.cursor && xyFromPoint(layout, peer.cursor)) || (peer.playTick != null && tickLine(layout, peer.playTick)) || null;
+        if (at) el.scrollTo({ top: Math.max(0, at.y - el.clientHeight / 3), left: Math.max(0, at.x - el.clientWidth / 3), behavior: 'smooth' });
       },
     }),
     [layout],

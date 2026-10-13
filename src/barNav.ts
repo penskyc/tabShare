@@ -60,7 +60,14 @@ function revealRow(api: alphaTab.AlphaTabApi, barIndex: number) {
   const host = (api.container as unknown as { element?: HTMLElement }).element;
   if (!row || !host || !(scroller instanceof HTMLElement)) return;
   const margin = 24;
-  const top = host.getBoundingClientRect().top - scroller.getBoundingClientRect().top + scroller.scrollTop + row.y;
-  if (top >= scroller.scrollTop + margin && top + row.h <= scroller.scrollTop + scroller.clientHeight - margin) return;
-  scroller.scrollTo({ top: Math.max(0, top - 2 * margin), behavior: 'smooth' });
+  const hostBox = host.getBoundingClientRect();
+  const box = scroller.getBoundingClientRect();
+  const top = hostBox.top - box.top + scroller.scrollTop + row.y;
+  const to: ScrollToOptions = { behavior: 'smooth' };
+  if (top < scroller.scrollTop + margin || top + row.h > scroller.scrollTop + scroller.clientHeight - margin) to.top = Math.max(0, top - 2 * margin);
+  // Horizontal layout is one long row: bring the bar itself into view sideways.
+  const bar = api.renderer.boundsLookup?.findMasterBarByIndex(barIndex)?.visualBounds;
+  const left = bar ? hostBox.left - box.left + scroller.scrollLeft + bar.x : scroller.scrollLeft;
+  if (bar && (left < scroller.scrollLeft + margin || left + bar.w > scroller.scrollLeft + scroller.clientWidth - margin)) to.left = Math.max(0, left - 2 * margin);
+  if (to.top != null || to.left != null) scroller.scrollTo(to);
 }

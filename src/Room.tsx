@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as alphaTab from '@coderline/alphatab';
-import { PlayerMode } from '@coderline/alphatab';
+import { LayoutMode, PlayerMode } from '@coderline/alphatab';
 import type { LinkPreview, Peer, TickRange } from '../shared/protocol';
 import { ALLOWED_EXTENSIONS, URL_RE } from '../shared/protocol';
 import { deleteTab, downloadTab, getConfig, uploadTab, type Profile, type Session } from './api';
@@ -146,6 +146,7 @@ export function Room({ session, profile, onLeave }: Props) {
     writePref('practice.mode', m);
   };
   const [zoom, setZoom] = useState(() => Number(readPref('zoom')) || 1);
+  const [layoutMode, setLayoutMode] = useState(() => Number(readPref('layout')) || LayoutMode.Page);
   const toggleFretboard = () => {
     setShowFretboard((v) => (writePref('fretboard.open', v ? '' : '1'), !v));
   };
@@ -467,11 +468,12 @@ export function Room({ session, profile, onLeave }: Props) {
   }, [api, metronome]);
   // Zoom re-lays out the score; cursors and selections follow because they're stored relative to bars and ticks.
   useEffect(() => {
-    if (!api || api.settings.display.scale === zoom) return;
+    if (!api || (api.settings.display.scale === zoom && api.settings.display.layoutMode === layoutMode)) return;
     api.settings.display.scale = zoom;
+    api.settings.display.layoutMode = layoutMode;
     api.updateSettings();
     if (api.score) api.render();
-  }, [api, zoom]);
+  }, [api, zoom, layoutMode]);
   useEffect(() => {
     if (api) api.countInVolume = countIn ? 1 : 0;
   }, [api, countIn]);
@@ -923,7 +925,7 @@ export function Room({ session, profile, onLeave }: Props) {
             </button>
           </div>
         </div>
-        <div className={`tab-view ${mode !== 'tab' ? 'off' : ''}`} aria-hidden={mode !== 'tab'}>
+        <div className={`tab-view ${mode !== 'tab' ? 'off' : ''} ${layoutMode === LayoutMode.Horizontal ? 'horizontal' : ''}`} aria-hidden={mode !== 'tab'}>
           {error && <div className="banner error">{error}</div>}
           {score && (
             <div className="song-head">
@@ -944,6 +946,17 @@ export function Room({ session, profile, onLeave }: Props) {
                 <button className={`tab-only ${scoreDark ? 'on' : ''}`} onClick={() => setScoreDark(!scoreDark)} title="Dark or light score" aria-pressed={scoreDark}>
                   {scoreDark ? '☾ Dark' : '☀ Light'}
                 </button>
+                <select
+                  className="layout-mode"
+                  value={layoutMode}
+                  onChange={(e) => (setLayoutMode(Number(e.target.value)), writePref('layout', e.target.value))}
+                  title="Score layout: Page = rows down the page, Horizontal = one endless row, Parchment = bars per row as set in the file"
+                  aria-label="Score layout"
+                >
+                  <option value={LayoutMode.Page}>Page</option>
+                  <option value={LayoutMode.Horizontal}>Horizontal</option>
+                  <option value={LayoutMode.Parchment}>Parchment</option>
+                </select>
                 <span className="zoom" role="group" aria-label="Zoom">
                   <button onClick={() => changeZoom(zoom - 0.1)} disabled={zoom <= 0.5} aria-label="Zoom out">
                     −
