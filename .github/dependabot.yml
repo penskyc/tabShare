@@ -1,0 +1,14 @@
+version: 2
+updates:
+  # alphaTab only: one weekly PR that bumps the library and its Vite plugin together (they must match).
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    allow:
+      - dependency-name: '@coderline/alphatab*'
+    groups:
+      alphatab:
+        patterns: ['@coderline/alphatab*']
+    commit-message:
+      prefix: 'deps'
