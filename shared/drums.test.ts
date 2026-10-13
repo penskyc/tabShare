@@ -8,7 +8,7 @@ function parse(tex: string) {
   i.initFromString(tex, new alphaTab.Settings());
   return i.readScore();
 }
-const kitNotes = new Set(Object.values(KIT));
+const kitNotes = new Set<number>(Object.values(KIT));
 const steps = (ts: '4/4' | '12/8') => (ts === '4/4' ? 16 : 12);
 
 test('every style × section type × seed: full bars, kit-only notes, deterministic', () => {
