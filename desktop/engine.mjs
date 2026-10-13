@@ -1,5 +1,6 @@
 // Native audio engine (Electron utility process): ASIO (Windows) / Core Audio (macOS) in → channel pick → input gain → NAM (WASM) → cab IR →
-// output gain → ASIO out, at the driver's buffer size. Also streams the processed signal to the page for the call.
+// output gain → ASIO out, at the driver's buffer size. Also streams the processed signal to the page for the call, and
+// (room audio) sends it to the other desktop apps in the room over SonoBus's networking, mixing theirs into the output.
 // Protocol: messages on the MessagePort the main process hands over (see main.js / preload.cjs, src/rig/native.ts).
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -13,7 +14,9 @@ const API = process.platform === 'darwin' ? RtAudioApi.MACOSX_CORE : RtAudioApi.
 const require = createRequire(import.meta.url);
 const MAX_BLOCK = 2048;
 const FEED_BLOCK = 512; // samples per message to the page (call audio; latency there doesn't matter much)
-const MAX_IR_SECONDS = 0.5; // shortcut: longer IR tails are cut; cab IRs are well under this
+const MAX_IR_SECONDS = 0.5;
+// Room audio: SonoBus's public connection server. Fixed here, not taken from the page (the page is remote content).
+const ROOM_AUDIO_SERVER = { host: 'aoo.sonobus.net', port: 10998 }; // shortcut: longer IR tails are cut; cab IRs are well under this
 
 /** The DSP chain, independent of the audio device so it can be tested offline. */
 export class Dsp {
@@ -113,7 +116,7 @@ if (process.parentPort) {
     const host = fileURLToPath(new URL('./native/build/Release/tabshare_plugin_host', import.meta.url)).replace('app.asar', 'app.asar.unpacked');
     vst.init((type, slot, state) => {
       if (type === 'editorClosed') send({ type: 'vstState', slot, state });
-      else if (type === 'hostExited' && rt) {
+      else if (type === 'hostExited' && rtKind === 'rig') {
         // A plugin took the host down. Stop like a crashed engine would; turning the rig on starts a new host and the
         // page loads its chain again.
         send({ type: 'error', message: 'The plugin host stopped (a plugin may have crashed). Turn the rig back on.' });
@@ -124,6 +127,19 @@ if (process.parentPort) {
     console.error('VST hosting unavailable:', e.message);
   }
   ready.then(() => (dsp.vst = vst));
+
+  // Room audio (tabshare_net.node, optional like VST hosting): without it the page never sees netStatus.
+  let net = null;
+  try {
+    net = new (require('./native/build/Release/tabshare_net.node').Room)();
+  } catch (e) {
+    console.error('Room audio unavailable:', e.message);
+  }
+  let netJoin = null; // { user, group, groupPassword, format } while the page is in a room
+  let listen = { on: false }; // Hear the room with the rig off: { on, device, outChannel, bufferSize }
+  let rtKind = null; // 'rig' | 'listen'
+  let stream = { sampleRate: 48000, block: 128 };
+  const netStart = () => netJoin && net.start({ ...netJoin, ...ROOM_AUDIO_SERVER, sampleRate: stream.sampleRate, blockSize: stream.block });
   const vstSlots = new Set();
   const unloadAllVst = () => {
     for (const slot of vstSlots) vst.unload(slot);
@@ -159,7 +175,9 @@ if (process.parentPort) {
       /* driver already gone */
     }
     rt = null;
-    send({ type: 'stopped' });
+    net?.setSending(false);
+    if (rtKind === 'rig') send({ type: 'stopped' });
+    rtKind = null;
   };
 
   const start = ({ device, outChannel = 0, bufferSize = 128 }) => {
@@ -193,6 +211,7 @@ if (process.parentPort) {
       (buf) => {
         const input = buf.byteOffset % 4 === 0 ? new Float32Array(buf.buffer, buf.byteOffset, buf.length / 4) : new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length));
         const y = dsp.process(input, nIn, out);
+        if (netJoin) net.process(y, out);
         if (written - consumed < 2) {
           api.write(outBytes);
           written++;
@@ -225,8 +244,61 @@ if (process.parentPort) {
     vst?.prepare(dsp.sampleRate, block);
     api.start();
     rt = api;
+    rtKind = 'rig';
+    stream = { sampleRate: dsp.sampleRate, block };
+    netStart();
+    net?.setSending(true);
     const latencyMs = ((api.getStreamLatency() + block) / dsp.sampleRate) * 1000;
     send({ type: 'started', device: d.name, sampleRate: dsp.sampleRate, bufferSize: block, latencyMs, inputs: nIn, outputs: d.outputChannels });
+  };
+
+  // Hear the room with the rig off: the same interface, output only, playing the other players' mix.
+  const startListen = () => {
+    const api = new RtAudio(API);
+    const d = api.getDevices().find((x) => x.name === listen.device) ?? api.getDevices().find((x) => x.outputChannels > 1);
+    if (!d) return;
+    const sampleRate = d.preferredSampleRate || 48000;
+    const firstOut = Math.min(listen.outChannel ?? 0, Math.max(0, d.outputChannels - 2));
+    let outBytes, out;
+    const write = () => {
+      out.fill(0);
+      net.process(null, out);
+      api.write(outBytes);
+    };
+    const block = api.openStream(
+      { deviceId: d.id, nChannels: 2, firstChannel: firstOut },
+      null,
+      RtAudioFormat.RTAUDIO_FLOAT32,
+      sampleRate,
+      Math.min(listen.bufferSize || 128, MAX_BLOCK),
+      'tabShare room audio',
+      null,
+      () => rtKind === 'listen' && write(), // output-only: refill one block per block played
+      0,
+      (type, msg) => type > 1 && send({ type: 'error', message: `Audio driver: ${msg}` }),
+    );
+    outBytes = Buffer.alloc(block * 2 * 4);
+    out = new Float32Array(outBytes.buffer, outBytes.byteOffset, block * 2);
+    rt = api;
+    rtKind = 'listen';
+    stream = { sampleRate: api.getStreamSampleRate() || sampleRate, block };
+    netStart();
+    net.setSending(false);
+    api.start();
+    write();
+    write();
+  };
+  // Open the listen stream only while someone is actually linked, so being alone in a room never grabs the interface.
+  const reconcileListen = (status) => {
+    const want = listen.on && netJoin && rtKind !== 'rig' && status.peers.some((p) => p.linked);
+    try {
+      if (want && !rtKind) startListen();
+      else if (!want && rtKind === 'listen') stop();
+    } catch (e) {
+      if (rtKind === 'listen') stop();
+      listen = { on: false };
+      send({ type: 'error', message: `Room audio output: ${e instanceof Error ? e.message : e}` });
+    }
   };
 
   const onMessage = (m) => {
@@ -239,6 +311,18 @@ if (process.parentPort) {
       else if (m.type === 'unloadModel') dsp.unloadModel();
       else if (m.type === 'ir') dsp.setIr(m.samples ?? null);
       else if (m.type === 'tap') tapOn = !!m.on;
+      else if (net && m.type === 'netJoin') {
+        netJoin = { user: String(m.user), group: String(m.group), groupPassword: String(m.password), format: netJoin?.format ?? 1 };
+        netStart();
+      } else if (net && m.type === 'netLeave') {
+        netJoin = null;
+        net.stop();
+        if (rtKind === 'listen') stop();
+      } else if (net && m.type === 'netFormat') {
+        if (netJoin) netJoin.format = m.index;
+        net.setFormat(m.index);
+      } else if (net && m.type === 'netPeer') net.setPeer(String(m.user), { gain: Number(m.gain), bufferMs: Number(m.bufferMs) || 0 });
+      else if (m.type === 'listen') listen = { on: !!m.on, device: m.device, outChannel: m.outChannel, bufferSize: m.bufferSize };
       else if (m.type === 'vstList') send({ type: 'vstList', available: !!vst, plugins: vst ? vst.list() : [] });
       else if (vst && m.type === 'vstLoad') {
         // The page is remote content: only load bundles from the installed-plugin folders, never a path it made up.
@@ -267,9 +351,17 @@ if (process.parentPort) {
     }
   };
 
+  // Room audio status for the page (also how it learns the feature exists), 4 Hz.
+  setInterval(() => {
+    if (!net) return;
+    const status = net.status();
+    reconcileListen(status);
+    send({ type: 'netStatus', ...status, listening: rtKind === 'listen' });
+  }, 250);
+
   // Input meter for the page, ~20 Hz.
   setInterval(() => {
-    if (!rt) return;
+    if (rtKind !== 'rig') return;
     send({ type: 'level', peak: dsp.peak ?? 0 });
     dsp.peak = 0;
   }, 50);
@@ -279,6 +371,9 @@ if (process.parentPort) {
     if (e.data?.type !== 'port') return;
     stop();
     if (vst && dsp) unloadAllVst(); // the new page loads its own chain
+    netJoin = null;
+    listen = { on: false };
+    net?.stop();
     tapOn = false;
     port = e.ports[0];
     port.on('message', (ev) => ready.then(() => onMessage(ev.data)));

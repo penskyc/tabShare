@@ -41,7 +41,15 @@ export const callSupported = () => window.isSecureContext && !!navigator.mediaDe
  * no glare; each connection has three transceivers in a fixed order — voice, instrument, video — and every media
  * change (mute, camera, device switch, screen share, rig on/off) is a replaceTrack — no renegotiation.
  */
-export function useCall(room: RoomConnection, instrumentStream: MediaStream | null = null, voiceStream: MediaStream | null = null) {
+const NO_IDS = new Set<string>();
+
+export function useCall(
+  room: RoomConnection,
+  instrumentStream: MediaStream | null = null,
+  voiceStream: MediaStream | null = null,
+  /** Desktop app: people whose instrument you already hear through room audio (their call instrument is skipped). */
+  directIds: Set<string> = NO_IDS,
+) {
   const [inCall, setInCall] = useState(false);
   const [mic, setMic] = useState(true);
   const [cam, setCam] = useState(true);
@@ -403,11 +411,11 @@ export function useCall(room: RoomConnection, instrumentStream: MediaStream | nu
     for (const [id, r] of Object.entries(remote)) {
       const levels = levelsFor(room.peers[id]?.name ?? '');
       audio.play(id, 'voice', r.voice, levels.voice);
-      audio.play(id, 'instrument', r.instrument, levels.instrument);
+      audio.play(id, 'instrument', r.instrument, directIds.has(id) ? 0 : levels.instrument);
     }
     audio.keepOnly(Object.keys(remote));
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [remote, levelsFor, peerNames]);
+  }, [remote, levelsFor, peerNames, directIds]);
   const setLevel = (name: string, part: MixPart, value: number) =>
     setMix((m) => {
       const next = { ...m, [mixKey(name)]: { ...levelsFor(name), [part]: value } };

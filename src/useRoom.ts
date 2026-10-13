@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type {
+  RoomAudio,
   BrowseState,
   DrumShare,
   SavedDrumSong,
@@ -24,6 +25,8 @@ type PresenceUpdate = Partial<Presence> & { jam?: boolean };
 export interface RoomConnection {
   status: ConnStatus;
   clientId: string | null;
+  /** Desktop apps' instrument audio group (from the welcome). */
+  audio: RoomAudio | null;
   roomName: string;
   tabs: TabMeta[];
   currentTabId: string | null;
@@ -62,6 +65,7 @@ const PRESENCE_INTERVAL_MS = 50;
 export function useRoom(session: Session, profile: Profile): RoomConnection {
   const [status, setStatus] = useState<ConnStatus>('connecting');
   const [clientId, setClientId] = useState<string | null>(null);
+  const [audio, setAudio] = useState<RoomAudio | null>(null);
   const [roomName, setRoomName] = useState(session.roomName);
   const [tabs, setTabs] = useState<TabMeta[]>([]);
   const [currentTabId, setCurrentTabId] = useState<string | null>(null);
@@ -130,6 +134,7 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
           case 'welcome':
             setStatus('open');
             setClientId(m.clientId);
+            setAudio(m.audio ?? null);
             setRoomName(m.room.name);
             setTabs(m.room.tabs);
             setCurrentTabId(m.room.currentTabId);
@@ -241,6 +246,7 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
   return {
     status,
     clientId,
+    audio,
     roomName,
     tabs,
     currentTabId,

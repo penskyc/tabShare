@@ -21,6 +21,13 @@ export type NativeToEngine =
   | { type: 'vstEditor'; slot: number }
   | { type: 'vstSaveAll' }
   | { type: 'tap'; on: boolean }
+  /** Room audio (desktop 0.4+): join the room's SonoBus group / leave it, send format, per-person mix. */
+  | { type: 'netJoin'; user: string; group: string; password: string }
+  | { type: 'netLeave' }
+  | { type: 'netFormat'; index: number }
+  | { type: 'netPeer'; user: string; gain: number; bufferMs: number }
+  /** Hear the room with the rig off: open this interface output-only while someone is linked. */
+  | { type: 'listen'; on: boolean; device: string; outChannel: number; bufferSize: number }
   /** iOS app: run an OAuth flow in the system sign-in sheet (handled by the app, not the engine). */
   | { type: 'authOpen'; url: string };
 
@@ -36,6 +43,37 @@ export interface VstEntry {
   state?: string;
 }
 
+/** One other desktop app in the room's audio group (user = `ts-<clientId>-<random>`). */
+export interface RoomAudioPeer {
+  user: string;
+  linked: boolean;
+  receiving: boolean;
+  /** New peers stay muted until their stream is clean. */
+  muted: boolean;
+  auto: boolean;
+  /** What you hear is this late (ms); -1 until measured. */
+  latencyMs: number;
+  rttMs: number;
+  bufferMs: number;
+  level: number;
+  drops: number;
+}
+
+export interface RoomAudioStatus {
+  state: 'off' | 'connecting' | 'connected' | 'error';
+  error?: string;
+  peers: RoomAudioPeer[];
+  /** Users whose direct link couldn't be made (they're heard through the call instead). */
+  failed: string[];
+  listening: boolean;
+}
+
+/** Send formats, in the engine's order. */
+export const ROOM_AUDIO_FORMATS = ['Opus 96 kbps', 'Opus 128 kbps', 'PCM 16-bit', 'PCM 24-bit'] as const;
+
+/** The room member a room-audio user belongs to. */
+export const clientIdOfAudioUser = (user: string) => /^ts-(.+)-[a-z0-9]{4}$/.exec(user)?.[1] ?? null;
+
 export type NativeFromEngine =
   | { type: 'devices'; devices: NativeDevice[] }
   | { type: 'started'; device: string; sampleRate: number; bufferSize: number; latencyMs: number; inputs: number; outputs: number }
@@ -50,6 +88,7 @@ export type NativeFromEngine =
   | { type: 'vstLoaded'; slot: number; name: string; latency: number }
   | { type: 'vstError'; slot: number; message: string }
   | { type: 'vstState'; slot: number; state: string }
+  | ({ type: 'netStatus' } & RoomAudioStatus)
   /** Dry input for the tuner (engine 0.2.2+). */
   | { type: 'tap'; samples: Float32Array; sampleRate: number }
   /** iOS app: where the sign-in sheet ended up (the callback URL), or null if canceled. */

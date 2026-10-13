@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { RoomAudioSection } from './RoomAudio';
+import type { RoomAudioControls } from './useRoomAudio';
 import type { RigControls } from './useRig';
 import * as t3k from './tone3000';
 import { DESKTOP_DOWNLOADS, NATIVE_DRIVER, type DesktopOs } from './native';
@@ -34,7 +36,7 @@ const captureCache = new Map<number, string>();
 const captureLabel = (m: t3k.T3kModel) => `${m.name || 'Capture'} · ${m.size}${m.architecture_version === 2 ? ' · A2' : ''}`;
 const loadConfig = () => (configPromise ??= fetch('/api/config').then((r) => r.json()).catch(() => ({ tone3000ClientId: null })));
 
-export function RigPanel({ rig, inCall }: { rig: RigControls; inCall: boolean }) {
+export function RigPanel({ rig, inCall, roomAudio }: { rig: RigControls; inCall: boolean; roomAudio?: RoomAudioControls }) {
   const [clientId, setClientId] = useState<string | null>(null);
   const [desktopDownload, setDesktopDownload] = useState<(typeof DESKTOP_DOWNLOADS)[DesktopOs] | null>(null);
   const [browsing, setBrowsing] = useState(false);
@@ -143,6 +145,13 @@ export function RigPanel({ rig, inCall }: { rig: RigControls; inCall: boolean })
           {rig.error} ✕
         </span>
       )}
+      {rig.native && /asio4all/i.test(rig.inputId) && (
+        <span className="call-error">
+          ASIO4ALL takes over every Windows audio device while the rig is on, including a USB or webcam mic for the call. Pick
+          your interface's own ASIO driver if it has one.
+        </span>
+      )}
+      {roomAudio?.available && <RoomAudioSection ra={roomAudio} rigOn={rig.on} />}
 
       <section className="rig-section">
         <h4>Input</h4>
@@ -314,7 +323,12 @@ export function RigPanel({ rig, inCall }: { rig: RigControls; inCall: boolean })
           <input type="checkbox" checked={rig.monitor} onChange={rig.toggleMonitor} /> Hear myself (monitor)
         </label>
         <label className="check">
-          <input type="checkbox" checked={rig.sendToCall} onChange={rig.toggleSend} /> Send to call {!inCall && <span className="muted small">(join the call to be heard)</span>}
+          <input type="checkbox" checked={rig.sendToCall} onChange={rig.toggleSend} /> Send to call{' '}
+          {roomAudio?.available ? (
+            <span className="muted small">(for people on the web or iPhone; desktop apps hear you through room audio)</span>
+          ) : (
+            !inCall && <span className="muted small">(join the call to be heard)</span>
+          )}
         </label>
         {rig.on && rig.latencyMs != null && (
           <span className="muted small">
