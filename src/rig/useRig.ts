@@ -98,7 +98,11 @@ export function useRig() {
   const engineRate = useRef(48000);
   const irBytes = useRef<ArrayBuffer | null>(null);
 
-  const nativeDev = nativeDevices.find((d) => d.name === inputId) ?? nativeDevices[0];
+  const nativeDev = nativeDevices.find((d) => d.name === inputId) ?? nativeDevices.find((d) => d.inputs > 0) ?? nativeDevices[0];
+  // Windows: only the picked driver gets loaded (to learn its channels), never the whole list.
+  useEffect(() => {
+    if (native && nativeDev?.probed === false) native.send({ type: 'devices', probe: nativeDev.name });
+  }, [nativeDev?.name, nativeDev?.probed]);
 
   const refreshDevices = useCallback(async () => {
     const all = await navigator.mediaDevices.enumerateDevices();
@@ -502,7 +506,7 @@ export function useRig() {
     tapNode: on && !native ? (nodes.current?.inGain ?? null) : null,
     /** True inside the desktop app (native ASIO engine). */
     native: !!native,
-    inputs: native ? nativeDevices.map((d) => ({ deviceId: d.name, label: d.name })) : inputs,
+    inputs: native ? nativeDevices.map((d) => ({ deviceId: d.name, label: d.probed && !d.inputs ? `${d.name} (not connected)` : d.name })) : inputs,
     outputs: native
       ? Array.from({ length: Math.floor((nativeDev?.outputs ?? 2) / 2) }, (_, i) => ({ deviceId: String(i * 2), label: `Out ${i * 2 + 1}/${i * 2 + 2}` }))
       : outputs,

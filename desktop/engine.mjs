@@ -2,6 +2,7 @@
 // output gain → ASIO out, at the driver's buffer size. Also streams the processed signal to the page for the call, and
 // (room audio) sends it to the other desktop apps in the room over SonoBus's networking, mixing theirs into the output.
 // Protocol: messages on the MessagePort the main process hands over (see main.js / preload.cjs, src/rig/native.ts).
+import { execFileSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
@@ -155,12 +156,45 @@ if (process.parentPort) {
   let tapLen = 0;
   const send = (m) => port?.postMessage(m); // MessagePortMain can only transfer ports, so PCM is copied
 
-  const listDevices = () => {
+  // Windows: never load an ASIO driver just to list it. Wrapper drivers (ASIO4ALL, FL Studio ASIO, …) take over the
+  // Windows audio devices when loaded, which silenced a USB call mic for good. Names come from the registry; RtAudio
+  // (patched, scripts/patch-audify.mjs) loads only the driver named in TABSHARE_ASIO_ONLY: the one picked or started.
+  const probed = new Map(); // name -> { inputs, outputs } (0/0: failed, e.g. interface unplugged)
+  const asioNames = () => {
     try {
-      return new RtAudio(API)
-        .getDevices()
-        .filter((d) => d.inputChannels > 0 && d.outputChannels > 0)
-        .map((d) => ({ name: d.name, inputs: d.inputChannels, outputs: d.outputChannels }));
+      const out = execFileSync('reg', ['query', 'HKLM\\SOFTWARE\\ASIO'], { encoding: 'utf8', windowsHide: true });
+      // RtAudio reads driver names into 32-byte buffers, so match its truncation.
+      return out
+        .split(/\r?\n/)
+        .map((l) => /^HKEY_LOCAL_MACHINE\\SOFTWARE\\ASIO\\(.+)$/.exec(l.trim())?.[1]?.slice(0, 31))
+        .filter(Boolean);
+    } catch {
+      return [];
+    }
+  };
+  /** A new RtAudio that only sees `name` (Windows; elsewhere every device, which is harmless). */
+  const rtaudioFor = (name) => {
+    if (process.platform === 'win32') process.env.TABSHARE_ASIO_ONLY = name || '<none>';
+    return new RtAudio(API);
+  };
+  const probe = (name) => {
+    try {
+      const d = rtaudioFor(name).getDevices().find((x) => x.name === name);
+      probed.set(name, { inputs: d?.inputChannels ?? 0, outputs: d?.outputChannels ?? 0 });
+    } catch {
+      probed.set(name, { inputs: 0, outputs: 0 });
+    }
+  };
+  const listDevices = (want) => {
+    try {
+      if (process.platform !== 'win32')
+        return new RtAudio(API)
+          .getDevices()
+          .filter((d) => d.inputChannels > 0 && d.outputChannels > 0)
+          .map((d) => ({ name: d.name, inputs: d.inputChannels, outputs: d.outputChannels }));
+      const names = asioNames();
+      if (want && names.includes(want) && !probed.has(want)) probe(want);
+      return names.map((name) => ({ name, inputs: probed.get(name)?.inputs ?? 0, outputs: probed.get(name)?.outputs ?? 0, probed: probed.has(name) }));
     } catch {
       return [];
     }
@@ -182,8 +216,8 @@ if (process.parentPort) {
 
   const start = ({ device, outChannel = 0, bufferSize = 128 }) => {
     stop();
-    const api = new RtAudio(API);
-    const d = api.getDevices().find((x) => x.name === device) ?? api.getDevices().find((x) => x.inputChannels > 0 && x.outputChannels > 1);
+    const api = rtaudioFor(device);
+    const d = api.getDevices().find((x) => x.name === device) ?? (process.platform === 'win32' ? undefined : api.getDevices().find((x) => x.inputChannels > 0 && x.outputChannels > 1));
     if (!d)
       throw new Error(
         process.platform === 'darwin'
@@ -254,8 +288,8 @@ if (process.parentPort) {
 
   // Hear the room with the rig off: the same interface, output only, playing the other players' mix.
   const startListen = () => {
-    const api = new RtAudio(API);
-    const d = api.getDevices().find((x) => x.name === listen.device) ?? api.getDevices().find((x) => x.outputChannels > 1);
+    const api = rtaudioFor(listen.device);
+    const d = api.getDevices().find((x) => x.name === listen.device) ?? (process.platform === 'win32' ? undefined : api.getDevices().find((x) => x.outputChannels > 1));
     if (!d) return;
     const sampleRate = d.preferredSampleRate || 48000;
     const firstOut = Math.min(listen.outChannel ?? 0, Math.max(0, d.outputChannels - 2));
@@ -303,7 +337,7 @@ if (process.parentPort) {
 
   const onMessage = (m) => {
     try {
-      if (m.type === 'devices') send({ type: 'devices', devices: listDevices() });
+      if (m.type === 'devices') send({ type: 'devices', devices: listDevices(m.probe) });
       else if (m.type === 'start') start(m);
       else if (m.type === 'stop') stop();
       else if (m.type === 'params') Object.assign(dsp.params, m.params);

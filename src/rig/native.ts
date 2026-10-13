@@ -4,10 +4,16 @@ export interface NativeDevice {
   name: string;
   inputs: number;
   outputs: number;
+  /**
+   * Windows, desktop 0.4+: drivers are listed from the registry without loading them (loading wrapper drivers like
+   * ASIO4ALL silenced USB call mics). false = not loaded yet, so the channel counts aren't known; ask with `probe`.
+   * true with 0 inputs = the driver didn't load (interface unplugged).
+   */
+  probed?: boolean;
 }
 
 export type NativeToEngine =
-  | { type: 'devices' }
+  | { type: 'devices'; probe?: string }
   | { type: 'start'; device: string; outChannel: number; bufferSize: number }
   | { type: 'stop' }
   | { type: 'params'; params: { channel: number; inGain: number; outGain: number; monitor: boolean; bypass: boolean; voiceChannel?: number } }
