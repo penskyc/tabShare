@@ -87,6 +87,13 @@ export type NativeFromEngine =
   | { type: 'error'; message: string }
   | { type: 'modelLoaded'; ok: boolean }
   | { type: 'level'; peak: number }
+  /**
+   * Desktop 0.4.1+, once a second while the rig runs: blocks lost in the last second. late = answered too late for the
+   * same callback, empty = nothing queued (queued mode), dropped = discarded to keep latency, skipped = driver block of
+   * another size, xruns = the driver's own over/underflows. mode: direct (same-callback output), queued (one block
+   * behind; macOS and older builds), fallback (direct kept running late, so the engine switched to queued).
+   */
+  | { type: 'audioStats'; late: number; empty: number; dropped: number; skipped: number; xruns: number; mode: 'direct' | 'queued' | 'fallback'; latencyMs: number }
   | { type: 'pcm'; samples: Float32Array }
   /** iOS app: the interface input picked for your voice (iOS uses one input device at a time). */
   | { type: 'voice'; samples: Float32Array }

@@ -232,6 +232,9 @@ if (process.parentPort) {
     // so blocks are dropped once more than one is waiting.
     let written = 0;
     let consumed = 0;
+    let dropped = 0;
+    // Same-callback output (patched audify, Windows): no queue, so every block is written.
+    let sync = false;
     const feed = new Float32Array(FEED_BLOCK);
     let feedLen = 0;
     let outBytes, out;
@@ -246,10 +249,10 @@ if (process.parentPort) {
         const input = buf.byteOffset % 4 === 0 ? new Float32Array(buf.buffer, buf.byteOffset, buf.length / 4) : new Float32Array(buf.buffer.slice(buf.byteOffset, buf.byteOffset + buf.length));
         const y = dsp.process(input, nIn, out);
         if (netJoin) net.process(y, out);
-        if (written - consumed < 2) {
+        if (sync || written - consumed < 2) {
           api.write(outBytes);
           written++;
-        }
+        } else dropped++;
         if (tapOn) {
           const ch = Math.min(dsp.params.channel, nIn - 1);
           for (let i = 0; i < block; i++) {
@@ -276,15 +279,43 @@ if (process.parentPort) {
     out = new Float32Array(outBytes.buffer, outBytes.byteOffset, block * 2);
     dsp.configure(api.getStreamSampleRate() || sampleRate, block);
     vst?.prepare(dsp.sampleRate, block);
+    // Patched audify (scripts/patch-audify.mjs): the audio thread waits up to 70% of a block for this block's output
+    // and plays it in the same callback, so there's no extra buffer of latency. Late answers play silence.
+    const blockUs = (block / dsp.sampleRate) * 1e6;
+    sync = typeof api.setSyncWait === 'function';
+    if (sync) api.setSyncWait(Math.round(blockUs * 0.7));
+    const latency = () => ((api.getStreamLatency() + (sync ? 0 : block)) / dsp.sampleRate) * 1000;
     api.start();
     rt = api;
     rtKind = 'rig';
     stream = { sampleRate: dsp.sampleRate, block };
     netStart();
     net?.setSending(true);
-    const latencyMs = ((api.getStreamLatency() + block) / dsp.sampleRate) * 1000;
-    send({ type: 'started', device: d.name, sampleRate: dsp.sampleRate, bufferSize: block, latencyMs, inputs: nIn, outputs: d.outputChannels });
+    send({ type: 'started', device: d.name, sampleRate: dsp.sampleRate, bufferSize: block, latencyMs: latency(), inputs: nIn, outputs: d.outputChannels });
+
+    // Dropouts for the page, once a second. More than 1% late blocks two seconds running → stock (queued) output,
+    // which gives the computer a whole extra block to answer, at the cost of one block of latency.
+    const zero = { late: 0, empty: 0, skipped: 0, xruns: 0 };
+    let prev = { ...zero, dropped: 0 };
+    let badSecs = 0;
+    let fellBack = false;
+    rigStats = () => {
+      const now = { ...(api.getStats?.() ?? zero), dropped };
+      const delta = Object.fromEntries(Object.keys(now).map((k) => [k, now[k] - prev[k]]));
+      prev = now;
+      const blocksPerSec = 1e6 / blockUs;
+      badSecs = sync && delta.late > Math.max(2, blocksPerSec * 0.01) ? badSecs + 1 : 0;
+      if (badSecs >= 2) {
+        sync = false;
+        fellBack = true;
+        api.setSyncWait(0);
+        written = consumed = 0;
+      }
+      send({ type: 'audioStats', ...delta, mode: sync ? 'direct' : fellBack ? 'fallback' : 'queued', latencyMs: latency() });
+    };
   };
+  let rigStats = null;
+  setInterval(() => rtKind === 'rig' && rigStats?.(), 1000);
 
   // Hear the room with the rig off: the same interface, output only, playing the other players' mix.
   const startListen = () => {

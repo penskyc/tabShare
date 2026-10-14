@@ -337,6 +337,15 @@ export function RigPanel({ rig, inCall, roomAudio }: { rig: RigControls; inCall:
               : `Browser output latency ≈ ${rig.latencyMs} ms (plus your interface's input latency).`}
           </span>
         )}
+        {rig.on && rig.audioHealth && (
+          <span className={`small ${rig.audioHealth.dropouts ? 'hint bad' : 'muted'}`}>
+            {rig.audioHealth.dropouts
+              ? `${rig.audioHealth.dropouts} audio dropouts in the last 10 s (heard as crackles). `
+              : 'No audio dropouts in the last 10 s. '}
+            {rig.audioHealth.mode === 'direct' && 'Output: direct, no extra buffer.'}
+            {rig.audioHealth.mode === 'fallback' && "Output: +1 buffer, because this computer kept answering the interface too late."}
+          </span>
+        )}
       </section>
     </div>
   );

@@ -96,6 +96,12 @@ try {
   await page.getByRole('button', { name: /turn on rig/i }).click();
   await page.getByText(/Round-trip latency/).waitFor({ timeout: 8000 });
   await page.locator('.rig-status.ok').waitFor({ timeout: 5000 });
+  // Dropout report (0.4.1+): once a second; Windows' patched audify plays output in the same callback ("direct").
+  const health = page.getByText(/audio dropouts in the last 10 s/);
+  await health.waitFor({ timeout: 5000 });
+  const healthText = await health.textContent();
+  console.log('audio health:', healthText);
+  if (process.platform === 'win32' && !/direct/.test(healthText)) fail(`expected direct output on Windows: ${healthText}`);
   // Cab IR: decoded and normalized by the page, convolved by the engine.
   await page.locator('input[type=file][accept*=".wav"]').setInputFiles(process.env.IR_FILE ?? '../.playwright-mcp/test-ir.wav');
   await page.getByRole('button', { name: 'Clear' }).waitFor({ timeout: 5000 });

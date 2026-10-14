@@ -76,6 +76,9 @@ export function useRig() {
   const [irName, setIrName] = useState<string | null>(null);
   const [level, setLevel] = useState(0);
   const [latencyMs, setLatencyMs] = useState<number | null>(null);
+  /** Desktop engine: blocks lost in the last 10 s and how output is timed (see 'audioStats' in native.ts). */
+  const [audioHealth, setAudioHealth] = useState<{ dropouts: number; mode: 'direct' | 'queued' | 'fallback' } | null>(null);
+  const lostRef = useRef<number[]>([]);
   const [instrumentStream, setInstrumentStream] = useState<MediaStream | null>(null);
 
   const nodes = useRef<{
@@ -212,6 +215,8 @@ export function useRig() {
     setVoiceStream(null);
     setOn(false);
     setLevel(0);
+    lostRef.current = [];
+    setAudioHealth(null);
   }, []);
 
   const stop = useCallback(() => {
@@ -303,6 +308,12 @@ export function useRig() {
       else if (m.type === 'error') setError(m.message);
       else if (m.type === 'modelLoaded') setModelStatus(m.ok ? 'ok' : 'error');
       else if (m.type === 'level') setLevel(m.peak);
+      else if (m.type === 'audioStats') {
+        const lost = m.late + m.empty + m.dropped + m.skipped + m.xruns;
+        lostRef.current = [...lostRef.current.slice(-9), lost];
+        setAudioHealth({ dropouts: lostRef.current.reduce((a, b) => a + b, 0), mode: m.mode });
+        setLatencyMs(Math.round(m.latencyMs * 10) / 10);
+      }
       else if (m.type === 'pcm') feed.current?.node.port.postMessage(m.samples, [m.samples.buffer]);
       else if (m.type === 'voice') feed.current?.voice?.port.postMessage(m.samples, [m.samples.buffer]);
       else if (m.type === 'vstList') {
@@ -535,6 +546,7 @@ export function useRig() {
     irName,
     level,
     latencyMs,
+    audioHealth,
     /** Processed instrument signal for the call (null when the rig is off or not sending). */
     callStream: sendToCall ? instrumentStream : null,
     /** iOS app with the rig on: replaces the mic in the call (null otherwise). */
