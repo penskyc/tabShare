@@ -154,6 +154,9 @@ function Lobby({
           <li>Amp rig: NAM models, TONE3000, cab IRs, sent into the call</li>
           <li>Desktop app for Windows &amp; Mac: ASIO / Core Audio, VST3, auto-updates</li>
         </ul>
+        <p>
+          <a href="/guide/">New here? Read the guide →</a>
+        </p>
         <div className="staff-art" aria-hidden>
           {Array.from({ length: 6 }).map((_, i) => (
             <span key={i} />

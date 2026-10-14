@@ -734,6 +734,9 @@ export function Room({ session, profile, onLeave }: Props) {
             📹 <span className="hide-narrow">{call.peersInCall.length ? `Join call (${call.peersInCall.length})` : 'Start call'}</span>
           </button>
         )}
+        <a className="btn ghost" href="/guide/" target="_blank" rel="noopener" title="Guide: how everything works">
+          ?
+        </a>
         <button className="btn ghost" onClick={onLeave}>
           Leave
         </button>
