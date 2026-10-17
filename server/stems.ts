@@ -16,7 +16,10 @@ export const stemsDir = (roomId: string, tab: TabMeta) => path.join(FILES_DIR, r
 export const stemFile = (roomId: string, tab: TabMeta, name: StemName) => path.join(stemsDir(roomId, tab), `${name}.mp3`);
 
 async function call(p: string, init: RequestInit = {}) {
-  const res = await fetch(base() + p, { ...init, signal: AbortSignal.timeout(TIMEOUT_MS) });
+  // StemDeck's server mode answers other machines only "over https" (for its own web app's secure context) and trusts
+  // X-Forwarded-Proto from reverse proxies; we're its only client, on the internal network.
+  const headers = { ...(init.headers as Record<string, string>), 'X-Forwarded-Proto': 'https' };
+  const res = await fetch(base() + p, { ...init, headers, signal: AbortSignal.timeout(TIMEOUT_MS) });
   if (!res.ok) {
     let detail = '';
     try {

@@ -31,6 +31,8 @@ const fake = createServer(async (req, res) => {
   const url = req.url ?? '';
   const body = await read(req);
   const json = (code: number, v: unknown) => (res.writeHead(code, { 'Content-Type': 'application/json' }), res.end(JSON.stringify(v)));
+  // Like StemDeck's server mode: other machines only "over https" (X-Forwarded-Proto from a proxy).
+  if (req.headers['x-forwarded-proto'] !== 'https') return void (res.writeHead(403), res.end('StemDeck needs an https:// address'));
   if (req.method === 'POST' && url === '/api/jobs') {
     const id = `job${next++}`;
     jobs.set(id, { status: 'queued', progress: 0, stage: 'Queued', body });
