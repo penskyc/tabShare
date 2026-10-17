@@ -551,3 +551,14 @@ body.call-window > div { height: 100%; }
 .ra-peer label.row { font-size: 12px; align-items: center; }
 .ra-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--line); flex: none; }
 .ra-dot.on { background: var(--accent, #ff7a1a); box-shadow: 0 0 6px var(--accent, #ff7a1a); }
+
+/* ---------- stems ---------- */
+.original-box.stems.mini { width: 220px; }
+.stems-panel { display: grid; gap: 8px; padding: 10px; border-top: 1px solid var(--line); }
+.stems-panel.row { display: flex; }
+.stems-panel p { margin: 0; }
+.stems-panel progress { width: 100%; accent-color: var(--accent); }
+.stems-panel .btn.small { padding: 4px 10px; font-size: 12px; justify-self: start; }
+.stems-panel.row .btn { margin-left: auto; }
+.panel-sub { margin: 10px 0 4px; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); }
+.stem-list .track-name { flex: 1; }

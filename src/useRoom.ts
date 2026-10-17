@@ -12,6 +12,7 @@ import type {
   Presence,
   ServerMessage,
   TabMeta,
+  SyncPoint,
   TabVideo,
   TickRange,
   TransportState,
@@ -58,6 +59,7 @@ export interface RoomConnection {
   onRtc: (fn: (from: string, data: unknown) => void) => () => void;
   sendTabMeta: (tabId: string, title?: string, artist?: string) => void;
   sendTabVideo: (tabId: string, youtube: TabVideo | null) => void;
+  sendStemSync: (tabId: string, syncPoints: SyncPoint[]) => void;
 }
 
 const PRESENCE_INTERVAL_MS = 50;
@@ -284,6 +286,7 @@ export function useRoom(session: Session, profile: Profile): RoomConnection {
     ),
     sendChat: useCallback((text: string) => raw({ type: 'chat', text }), [raw]),
     sendTabVideo: useCallback((tabId: string, youtube: TabVideo | null) => raw({ type: 'tabVideo', tabId, youtube }), [raw]),
+    sendStemSync: useCallback((tabId: string, syncPoints: SyncPoint[]) => raw({ type: 'stemSync', tabId, syncPoints }), [raw]),
     sendRtc: useCallback((to: string, data: unknown) => raw({ type: 'rtc', to, data }), [raw]),
     onRtc: useCallback((fn: (from: string, data: unknown) => void) => {
       rtcListeners.current.add(fn);

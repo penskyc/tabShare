@@ -31,6 +31,29 @@ export interface TabMeta {
   artist?: string;
   /** Original recording on YouTube, used by the "Original" audio source. */
   youtube?: TabVideo;
+  /** Stems of the original recording (StemDeck), used by the "Stems" audio source. */
+  stems?: TabStems;
+}
+
+/** The stems StemDeck's htdemucs_6s model makes, in mixer order. Mix stem indexes point into this list. */
+export const STEM_NAMES = ['vocals', 'drums', 'bass', 'guitar', 'piano', 'other'] as const;
+export type StemName = (typeof STEM_NAMES)[number];
+
+export interface TabStems {
+  status: 'queued' | 'running' | 'ready' | 'error';
+  /** Made from the tab's YouTube video (same timeline, so its sync points apply) or from an uploaded file. */
+  from: 'youtube' | 'upload';
+  videoId?: string;
+  /** StemDeck's stage text and progress (0–1) while it works. */
+  stage?: string;
+  progress?: number;
+  error?: string;
+  /** StemDeck job id while queued/running (server only cares). */
+  jobId?: string;
+  /** Stems that have audio (silent ones are left out). */
+  names: StemName[];
+  /** Uploaded stems have their own timeline, so their own sync points. */
+  syncPoints?: SyncPoint[];
 }
 
 /** Layout-independent position on the score: master bar index + fraction within that bar's bounds. */
@@ -96,8 +119,12 @@ export interface MixState {
   volumes: number[];
   metronome: boolean;
   countIn: boolean;
-  /** Audio source: synthesizer or the tab's linked original recording. */
-  source: 'synth' | 'original';
+  /** Audio source: synthesizer, the tab's linked original recording, or its stems. */
+  source: 'synth' | 'original' | 'stems';
+  /** Stem mixer, by index into STEM_NAMES (volumes 0–2, missing = 1). */
+  stemMuted: number[];
+  stemSoloed: number[];
+  stemVolumes: number[];
   by: string;
 }
 
@@ -160,6 +187,8 @@ export type ClientMessage =
   | { type: 'setTab'; tabId: string }
   | { type: 'tabMeta'; tabId: string; title?: string; artist?: string }
   | { type: 'tabVideo'; tabId: string; youtube: TabVideo | null }
+  /** Sync points of uploaded stems. */
+  | { type: 'stemSync'; tabId: string; syncPoints: SyncPoint[] }
   | { type: 'setLoop'; loop: TickRange | null }
   | { type: 'transport'; playing: boolean; timeMs: number; speed: number }
   | ({ type: 'mix' } & Omit<MixState, 'by'>)
@@ -208,3 +237,7 @@ export const URL_RE = /https?:\/\/[^\s<>"']+[^\s<>"'.,;:!?)\]]/i;
 
 export const ALLOWED_EXTENSIONS = ['gp', 'gp3', 'gp4', 'gp5', 'gpx', 'xml', 'musicxml', 'mxl', 'tex', 'capx'];
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
+
+/** Audio files that can be split into stems (what StemDeck accepts). */
+export const AUDIO_EXTENSIONS = ['mp3', 'wav', 'flac', 'ogg', 'opus', 'm4a'];
+export const MAX_AUDIO_BYTES = 100 * 1024 * 1024;

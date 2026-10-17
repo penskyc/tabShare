@@ -8,7 +8,7 @@ deployment notes, if any, live in the gitignored `CLAUDE.local.md`; read it too 
 drag-drop, in-app alphaTex editor, **Songsterr search + one-click import**) rendered by alphaTab; live cursors, selections and playheads; synth playback with
 speed, metronome, count-in, per-track view/mute/solo/volume; shared loops; **jam sync** (on by default) that syncs
 play/pause/seek/speed plus the whole mix (tracks, mute, solo, volume, metronome, count-in, Synth/Original);
-**Original audio**: a YouTube recording per tab with tap-to-sync bar points; chat with clickable links + Open Graph
+**Original audio**: a YouTube recording per tab with tap-to-sync bar points, and **Stems** (StemDeck splits it into vocals/drums/bass/guitar/piano/other with a shared mute/solo/volume mixer); chat with clickable links + Open Graph
 previews; mesh WebRTC **video/voice call** (device pickers, mute, camera, screen share, "original sound"); **room audio**
 (desktop apps hear each other's instruments peer to peer via SonoBus's networking); **instrument
 rig**: audio-interface input → NAM amp model (WASM) → cab IR → monitor + mixed into the call, with local `.nam` files or
@@ -22,6 +22,16 @@ macOS) that loads the live site and runs the rig through a native **ASIO** (Wind
 - `shared/protocol.ts`: every wire type, plus `URL_RE` (chat link detection, shared by client and server). Change it first when adding a message.
 - `shared/sync.ts`: YouTube id parsing, bar play order with repeat occurrences, merging and shifting sync points (tests in `shared/sync.test.ts`).
 - `src/OriginalAudio.tsx`: "Original" audio source. YouTube IFrame player box plus tap-sync tools.
+- **Stems** (third audio source: Synth | Original | Stems): `server/stems.ts` drives a StemDeck sidecar
+  (`ghcr.io/stemdeckapp/stemdeck:0.20.0`, pinned: its API is internal to its web app; `STEMDECK_URL` unset = feature
+  hidden, `/api/config.stems`). `POST /api/rooms/:id/tabs/:tab/stems` (`?from=youtube` = the linked video, or a raw
+  audio body `?name=`, ≤ 100 MB) submits a job; StemDeck queues; a 3 s poller follows `TabMeta.stems` (status/stage/
+  progress, broadcast as `tabs`), downloads the MP3s (silent stems by `stem_presence` dropped) to
+  `files/<room>/<tab>.stems/`, deletes the job. `src/stemPlayer.ts` implements `YTPlayer` (one `<audio>` per stem →
+  GainNode, element 0 is the clock, others realigned past 40 ms), so the external-media handler and tap sync are
+  unchanged. Mixer = `MixState.stemMuted/stemSoloed/stemVolumes` (indexes into `STEM_NAMES`), `src/Stems.tsx`.
+  YouTube stems use the video's sync points; uploaded ones keep `stems.syncPoints` (`stemSync`). Tests:
+  `server/stems.test.ts`, `.playwright-mcp/stems.mjs` (fake StemDeck, production build). Spec in `docs/superpowers/`.
 - `src/rig/`: instrument rig. `useRig.ts` (audio graph), `nam-processor.ts` (AudioWorklet + @opendaw/nam-wasm), `audioContext.ts` (one shared 48 kHz interactive AudioContext for the rig and the call mixer), `tone3000.ts` (OAuth PKCE popup Select flow + model download), `RigPanel.tsx`. `public/t3k-callback.html` relays the OAuth redirect to the opener.
 - `server/songsterr/`: Songsterr search + import. `index.ts` (search `/api/songs?pattern=`, meta `/api/meta/<id>` → revisionId + image, part JSONs from the CloudFront CDN), plus the JSON → GP7 converter vendored from Metaphysics0/songsterr-downloader (MIT, `LICENSE` kept; changed: import paths, and unnamed tracks take the instrument name). Room-scoped routes `GET /api/rooms/:id/songsterr?q=` and `POST /api/rooms/:id/songsterr/:songId` (→ `addTab`). UI: `src/SongsterrSearch.tsx` in the Library panel. Live test: `SONGSTERR_LIVE=1 npm test`.
 - `server/unfurl.ts`: chat link previews (Open Graph / twitter / `<title>`), with an SSRF guard. Tests in `server/unfurl.test.ts` (`npm test`).

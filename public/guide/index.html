@@ -209,7 +209,7 @@
           <h2>Jam sync</h2>
           <p>
             On by default. While it's on, <b>play, pause, seeking, speed</b> and the <b>mix</b> (mute, solo, volume, metronome, count-in,
-            Synth/Original) are the same for everyone who has it on. Someone joining late catches up to where you are.
+            Synth/Original/Stems, the stem mixer) are the same for everyone who has it on. Someone joining late catches up to where you are.
           </p>
           <ul>
             <li>Turn it off to practice on your own without moving anyone else. Turning it back on picks up the room's current state.</li>
@@ -227,6 +227,22 @@
             <li>Now clicking in the tab jumps the video to the same spot, and the cursor follows the recording.</li>
           </ol>
           <p>Track mute/solo, metronome and count-in don't apply to a recording, so they're greyed out. The video box can be minimized and dragged anywhere, but YouTube requires it to stay visible.</p>
+        </section>
+
+        <section id="stems" data-group="Tabs">
+          <h2>Stems: mute and solo the recording</h2>
+          <p>Split the original recording into <b>vocals, drums, bass, guitar, piano and other</b>, then mute, solo and set the volume of each one, e.g. mute the bass and play it yourself.</p>
+          <ol class="steps">
+            <li>Press <b>Stems</b> next to Original. The first time, choose <b>From the YouTube video</b> (the one linked in Original) or <b>Upload audio…</b> (mp3, wav, flac, ogg, opus or m4a, up to 100 MB).</li>
+            <li>It takes a few minutes, once per tab. Everyone in the room sees the progress and can keep playing; the stems appear for all when they're ready.</li>
+            <li>Open the <b>Tracks</b> panel: the stem mixer is at the top (M = mute, S = solo, slider = volume). With jam sync on, the stem mix is shared too.</li>
+          </ol>
+          <ul>
+            <li>Stems made from the YouTube video use its sync points. Stems from an uploaded file have their own: sync them with <b>⏱ Sync</b> in the Stems box, like a video.</li>
+            <li>Speed changes keep the pitch, like the video. Stems that are silent (often piano) aren't listed.</li>
+            <li><b>Remove</b> in the Stems box deletes them, e.g. to make them again from another source.</li>
+          </ul>
+          <div class="tip"><p>Only on servers that run StemDeck next to tabShare (see <a href="#admin">Running the server</a>). The separation is done by Meta's Demucs model, so expect a little bleed between parts.</p></div>
         </section>
 
         <!-- ================= TOGETHER ================= -->
@@ -352,6 +368,7 @@
             <li><a href="/#/admin">Admin</a>: create rooms (rooms need the admin by default), change a room's password (this signs everyone in it out), delete rooms, see who's online.</li>
             <li><b>API keys</b> for desktop apps: one per person, shown once, revocable.</li>
             <li><b>Settings</b>: public URL (used in invite links), port, TONE3000 key.</li>
+            <li><b>Stems</b>: run <a href="https://github.com/stemdeckapp/stemdeck">StemDeck</a> next to tabShare (see the commented <code>stemdeck</code> service in <code>compose.yaml</code>) and set <code>STEMDECK_URL</code>. Without it the Stems button is hidden. Separation runs on the CPU (a few minutes a song) or an NVIDIA GPU. Pulling audio from YouTube can go against YouTube's terms and stops working when YouTube blocks the server; uploads always work.</li>
           </ul>
         </section>
       </main>

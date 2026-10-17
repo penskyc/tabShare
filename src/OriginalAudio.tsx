@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import type { SyncPoint, TabVideo } from '../shared/protocol';
 import { mergeSyncPoints, parseYouTubeId, shiftSyncPoints, type PlayedBar } from '../shared/sync';
+import { StemPlayer } from './stemPlayer';
 
 const readLocal = (k: string) => {
   try {
@@ -57,6 +58,11 @@ export const YT_ENDED = 0;
 
 interface Props {
   video: TabVideo | undefined;
+  /** Stems mode: the stems' URLs once they exist (they play instead of YouTube), and the panel that makes them. */
+  stems?: { urls: string[] | null; panel: ReactNode };
+  /** Sync points of what's playing (the video's, or uploaded stems' own). */
+  syncPoints: SyncPoint[];
+  onSaveSync: (points: SyncPoint[]) => void;
   /** Bars in playback order, for mapping taps to (bar, occurrence). */
   getPlayOrder: () => PlayedBar[];
   /** 0-based master bar index under the cursor, used as the default tap start. */
@@ -66,7 +72,10 @@ interface Props {
   onSave: (video: TabVideo | null) => void;
 }
 
-export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, onStateChange, onSave }: Props) {
+export function OriginalAudio({ video, stems, syncPoints, onSaveSync, getPlayOrder, getCurrentBar, onPlayer, onStateChange, onSave }: Props) {
+  const stemUrls = stems?.urls ?? null;
+  // Something to play: the stems in Stems mode, else the YouTube video.
+  const media = stems ? !!stemUrls : !!video;
   const hostRef = useRef<HTMLDivElement>(null);
   const playerRef = useRef<YTPlayer | null>(null);
   const [url, setUrl] = useState('');
@@ -118,16 +127,31 @@ export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, on
   const cb = useRef({ onPlayer, onStateChange });
   cb.current = { onPlayer, onStateChange };
 
-  // (Re)create the YouTube player when the video changes.
+  // Stems mode: the stem player (no video to show).
+  const stemKey = stemUrls?.join(' ');
   useEffect(() => {
-    if (!video?.videoId || !hostRef.current) return;
+    if (!stemKey) return;
+    const player = new StemPlayer(stemKey.split(' '), (s) => cb.current.onStateChange(s));
+    playerRef.current = player;
+    cb.current.onPlayer(player);
+    return () => {
+      cb.current.onPlayer(null);
+      player.destroy();
+      playerRef.current = null;
+    };
+  }, [stemKey]);
+
+  // (Re)create the YouTube player when the video changes.
+  const videoId = stems ? undefined : video?.videoId;
+  useEffect(() => {
+    if (!videoId || !hostRef.current) return;
     let cancelled = false;
     const mount = document.createElement('div');
     hostRef.current.replaceChildren(mount);
     loadYouTubeApi().then(() => {
       if (cancelled || !window.YT) return;
       const player = new window.YT.Player(mount, {
-        videoId: video.videoId,
+        videoId,
         width: '100%',
         height: '100%',
         playerVars: { playsinline: 1, rel: 0, modestbranding: 1 },
@@ -146,7 +170,7 @@ export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, on
       playerRef.current?.destroy();
       playerRef.current = null;
     };
-  }, [video?.videoId]);
+  }, [videoId]);
 
   const saveUrl = () => {
     const id = parseYouTubeId(url);
@@ -174,7 +198,7 @@ export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, on
   };
 
   const finishTapping = () => {
-    if (video && tapping?.taps.length) onSave({ videoId: video.videoId, syncPoints: mergeSyncPoints(video.syncPoints, tapping.taps) });
+    if (media && tapping?.taps.length) onSaveSync(mergeSyncPoints(syncPoints, tapping.taps));
     setTapping(null);
   };
 
@@ -199,22 +223,18 @@ export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, on
   return (
     <div
       ref={boxRef}
-      className={`original-box ${mini ? 'mini' : ''}`}
+      className={`original-box ${mini ? 'mini' : ''} ${stems ? 'stems' : ''}`}
       style={pos ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' } : undefined}
     >
       <div className="original-head" onPointerDown={startDrag} title="Drag to move">
-        <strong>Original audio</strong>
-        {video && !mini && (
-          <span className="muted small">
-            {video.syncPoints.length ? `${video.syncPoints.length} sync points` : 'not synced yet'}
-          </span>
-        )}
-        {video && !mini && (
+        <strong>{stems ? 'Stems' : 'Original audio'}</strong>
+        {media && !mini && <span className="muted small">{syncPoints.length ? `${syncPoints.length} sync points` : 'not synced yet'}</span>}
+        {media && !mini && (
           <button className={`call-btn ${showSync ? 'on' : ''}`} onClick={() => setShowSync(!showSync)}>
             ⏱ Sync
           </button>
         )}
-        {video && (
+        {media && (
           <button className="call-btn yt-min" onClick={toggleMini} aria-label={mini ? 'Expand' : 'Minimize'} title={mini ? 'Expand' : 'Minimize'}>
             {mini ? '▢' : '–'}
           </button>
@@ -222,28 +242,34 @@ export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, on
       </div>
 
       {/* YouTube's terms require a visible player of at least 200×200. */}
-      <div className="original-video" ref={hostRef} hidden={!video} />
+      <div className="original-video" ref={hostRef} hidden={!!stems || !video} />
 
-      {(!video || (showSync && !mini)) && (
+      {stems && !mini && stems.panel}
+
+      {(!media || (showSync && !mini)) && (!stems || media) && (
         <div className="original-tools">
-          <div className="row gap">
-            <input
-              placeholder={video ? 'Replace YouTube link…' : 'Paste a YouTube link for this tab'}
-              value={url}
-              onChange={(e) => setUrl(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && saveUrl()}
-            />
-            <button className="btn" onClick={saveUrl}>
-              Link
-            </button>
-          </div>
-          {urlError && <span className="call-error">That doesn't look like a YouTube link.</span>}
+          {!stems && (
+            <>
+              <div className="row gap">
+                <input
+                  placeholder={video ? 'Replace YouTube link…' : 'Paste a YouTube link for this tab'}
+                  value={url}
+                  onChange={(e) => setUrl(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && saveUrl()}
+                />
+                <button className="btn" onClick={saveUrl}>
+                  Link
+                </button>
+              </div>
+              {urlError && <span className="call-error">That doesn't look like a YouTube link.</span>}
+            </>
+          )}
 
-          {video && !tapping && (
+          {media && !tapping && (
             <>
               <p className="muted small">
-                Tap sync: play the video and press <b>T</b> on the first beat of every bar. Tapping just bar 1 sets the start
-                offset; more taps follow tempo changes.
+                Tap sync: play the {stems ? 'song' : 'video'} and press <b>T</b> on the first beat of every bar. Tapping just
+                bar 1 sets the start offset; more taps follow tempo changes.
               </p>
               <div className="row gap">
                 <label className="small muted row gap">
@@ -259,18 +285,20 @@ export function OriginalAudio({ video, getPlayOrder, getCurrentBar, onPlayer, on
               </div>
               <div className="row gap">
                 <span className="small muted">Shift all</span>
-                <button className="btn" disabled={!video.syncPoints.length} onClick={() => onSave({ ...video, syncPoints: shiftSyncPoints(video.syncPoints, -50) })}>
+                <button className="btn" disabled={!syncPoints.length} onClick={() => onSaveSync(shiftSyncPoints(syncPoints, -50))}>
                   −50 ms
                 </button>
-                <button className="btn" disabled={!video.syncPoints.length} onClick={() => onSave({ ...video, syncPoints: shiftSyncPoints(video.syncPoints, 50) })}>
+                <button className="btn" disabled={!syncPoints.length} onClick={() => onSaveSync(shiftSyncPoints(syncPoints, 50))}>
                   +50 ms
                 </button>
-                <button className="btn ghost" disabled={!video.syncPoints.length} onClick={() => window.confirm('Clear all sync points?') && onSave({ ...video, syncPoints: [] })}>
+                <button className="btn ghost" disabled={!syncPoints.length} onClick={() => window.confirm('Clear all sync points?') && onSaveSync([])}>
                   Clear
                 </button>
-                <button className="btn ghost danger" onClick={() => window.confirm('Unlink the video from this tab?') && onSave(null)}>
-                  Unlink
-                </button>
+                {!stems && (
+                  <button className="btn ghost danger" onClick={() => window.confirm('Unlink the video from this tab?') && onSave(null)}>
+                    Unlink
+                  </button>
+                )}
               </div>
             </>
           )}

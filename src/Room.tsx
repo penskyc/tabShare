@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as alphaTab from '@coderline/alphatab';
 import { LayoutMode, PlayerMode } from '@coderline/alphatab';
-import type { LinkPreview, Peer, TickRange } from '../shared/protocol';
-import { ALLOWED_EXTENSIONS, URL_RE } from '../shared/protocol';
-import { deleteTab, downloadTab, getConfig, uploadTab, type Profile, type Session } from './api';
+import type { LinkPreview, Peer, SyncPoint, TickRange } from '../shared/protocol';
+import { ALLOWED_EXTENSIONS, STEM_NAMES, URL_RE } from '../shared/protocol';
+import { deleteTab, downloadTab, getConfig, stemUrl, uploadTab, type Profile, type Session } from './api';
 import { useRoom } from './useRoom';
 import { ScoreView, type ScoreViewHandle } from './ScoreView';
 import { useCall } from './useCall';
@@ -23,6 +23,8 @@ import { lightOnly, setSoundBank, SOUND_BANKS, useSoundBank, type SoundBankId } 
 import { setScoreDark, useScoreDark } from './scoreTheme';
 import { OriginalAudio, YT_ENDED, YT_PAUSED, YT_PLAYING, type YTPlayer } from './OriginalAudio';
 import { playOrder } from '../shared/sync';
+import { StemPlayer, stemGain } from './stemPlayer';
+import { StemMixer, StemsPanel } from './Stems';
 
 const PLAYING = 1; // alphaTab.synth.PlayerState.Playing
 type Mode = 'tab' | 'practice' | 'drums' | 'browser';
@@ -89,6 +91,10 @@ export function Room({ session, profile, onLeave }: Props) {
   const [speed, setSpeed] = useState(1);
   const [metronome, setMetronome] = useState(false);
   const [countIn, setCountIn] = useState(false);
+  // Stem mixer (Stems source), by index into STEM_NAMES.
+  const [stemMuted, setStemMuted] = useState<Set<number>>(new Set());
+  const [stemSoloed, setStemSoloed] = useState<Set<number>>(new Set());
+  const [stemVolumes, setStemVolumes] = useState<number[]>([]);
   const [selection, setSelection] = useState<TickRange | null>(null);
   const [visibleTracks, setVisibleTracks] = useState<number[]>([0]);
   const [muted, setMuted] = useState<Set<number>>(new Set());
@@ -174,8 +180,8 @@ export function Room({ session, profile, onLeave }: Props) {
   const peers = useMemo(() => Object.values(room.peers), [room.peers]);
   const currentTab = room.tabs.find((t) => t.id === room.currentTabId) ?? null;
 
-  // ---------- audio source: synth or original recording (YouTube) ----------
-  const [source, setSource] = useState<'synth' | 'original'>('synth');
+  // ---------- audio source: synth, original recording (YouTube) or its stems ----------
+  const [source, setSource] = useState<'synth' | 'original' | 'stems'>('synth');
   const [yt, setYt] = useState<YTPlayer | null>(null);
   const ytRef = useRef<YTPlayer | null>(null);
   // Set synchronously when the player is created/destroyed (not on render), so effects running in the same
@@ -194,8 +200,26 @@ export function Room({ session, profile, onLeave }: Props) {
       return fallback;
     }
   };
-  const original = source === 'original' && !!currentTab?.youtube && !!yt;
-  const videoKey = JSON.stringify(currentTab?.youtube ?? null);
+  const stems = currentTab?.stems;
+  const stemsReady = stems?.status === 'ready';
+  // External media drives alphaTab: the YouTube player, or the stem player in Stems mode.
+  const original = !!yt && ((source === 'original' && !!currentTab?.youtube) || (source === 'stems' && stemsReady));
+  // Uploaded stems have their own timeline; YouTube stems share the video's.
+  const syncPoints: SyncPoint[] =
+    (source === 'stems' && stems?.from === 'upload' ? stems.syncPoints : currentTab?.youtube?.syncPoints) ?? [];
+  const syncPointsRef = useRef(syncPoints);
+  syncPointsRef.current = syncPoints;
+  const videoKey = JSON.stringify(syncPoints);
+  const stemUrls = useMemo(
+    () => (currentTab && stems?.status === 'ready' ? stems.names.map((n) => stemUrl(session, currentTab.id, n)) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [session, currentTab?.id, stems?.status, stems?.names.join()],
+  );
+  const saveSyncPoints = (points: SyncPoint[]) => {
+    if (!currentTab) return;
+    if (source === 'stems' && stems?.from === 'upload') room.sendStemSync(currentTab.id, points);
+    else if (currentTab.youtube) room.sendTabVideo(currentTab.id, { ...currentTab.youtube, syncPoints: points });
+  };
 
   useEffect(() => {
     if (room.status === 'open') room.setPresence({ jam: jamRef.current });
@@ -246,8 +270,7 @@ export function Room({ session, profile, onLeave }: Props) {
         const tabId = roomRef.current.currentTabId;
         if (tabId) roomRef.current.sendTabMeta(tabId, s.title, s.artist);
         // Sync points live in the score model; apply before the player builds its time axis.
-        const video = roomRef.current.tabs.find((t) => t.id === tabId)?.youtube;
-        s.applyFlatSyncPoints(video?.syncPoints ?? []);
+        s.applyFlatSyncPoints(syncPointsRef.current);
       }),
     );
     offs.push(api.playerReady.on(() => setReady(true)));
@@ -333,7 +356,7 @@ export function Room({ session, profile, onLeave }: Props) {
   // Sync point edits from anyone in the room.
   useEffect(() => {
     if (!api || !score) return;
-    score.applyFlatSyncPoints(currentTab?.youtube?.syncPoints ?? []);
+    score.applyFlatSyncPoints(syncPoints);
     api.updateSyncPoints();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [api, score, videoKey]);
@@ -547,7 +570,10 @@ export function Room({ session, profile, onLeave }: Props) {
     volumes?: number[];
     metronome?: boolean;
     countIn?: boolean;
-    source?: 'synth' | 'original';
+    source?: 'synth' | 'original' | 'stems';
+    sm?: Set<number>;
+    ss?: Set<number>;
+    sv?: number[];
   };
   // Track view follows the jam unless you turn it off (a guitarist and a bassist may want different tracks on screen).
   const [syncView, setSyncView] = useState(() => readPref('jam.syncView') !== '0');
@@ -565,6 +591,9 @@ export function Room({ session, profile, onLeave }: Props) {
       metronome: c.metronome ?? metronome,
       countIn: c.countIn ?? countIn,
       source: c.source ?? source,
+      sm: c.sm ?? stemMuted,
+      ss: c.ss ?? stemSoloed,
+      sv: c.sv ?? stemVolumes,
     };
     setVisibleTracks(next.tracks);
     setMuted(next.m);
@@ -573,6 +602,9 @@ export function Room({ session, profile, onLeave }: Props) {
     setMetronome(next.metronome);
     setCountIn(next.countIn);
     setSource(next.source);
+    setStemMuted(next.sm);
+    setStemSoloed(next.ss);
+    setStemVolumes(next.sv);
     if (!jamRef.current) return;
     // Volume sliders fire continuously; coalesce into one message per ~150 ms.
     window.clearTimeout(mixSendTimer.current);
@@ -587,8 +619,11 @@ export function Room({ session, profile, onLeave }: Props) {
           metronome: next.metronome,
           countIn: next.countIn,
           source: next.source,
+          stemMuted: [...next.sm],
+          stemSoloed: [...next.ss],
+          stemVolumes: next.sv,
         }),
-      c.volumes ? 150 : 0,
+      c.volumes || c.sv ? 150 : 0,
     );
   };
   const setTrackVolume = (i: number, v: number) => {
@@ -609,6 +644,17 @@ export function Room({ session, profile, onLeave }: Props) {
     writePref('jam.syncView', on ? '1' : '0');
     if (on && jamRef.current) applyMix();
   };
+  const setStemVolume = (i: number, v: number) => {
+    const next = [...stemVolumes];
+    for (let k = next.length; k < i; k++) next[k] = 1;
+    next[i] = v;
+    changeMix({ sv: next });
+  };
+  // The stem player plays what the stem mixer says.
+  useEffect(() => {
+    if (yt instanceof StemPlayer && stems?.status === 'ready')
+      yt.setGains(stems.names.map((n) => stemGain(STEM_NAMES.indexOf(n), stemMuted, stemSoloed, stemVolumes)));
+  }, [yt, stems, stemMuted, stemSoloed, stemVolumes]);
   const toggleMute = (t: alphaTab.model.Track) => changeMix({ m: toggleSet(muted, t.index) });
   const toggleSolo = (t: alphaTab.model.Track) => changeMix({ s: toggleSet(soloed, t.index) });
 
@@ -625,6 +671,9 @@ export function Room({ session, profile, onLeave }: Props) {
     setMetronome(m.metronome);
     setCountIn(m.countIn);
     setSource(m.source ?? 'synth');
+    setStemMuted(new Set(m.stemMuted ?? []));
+    setStemSoloed(new Set(m.stemSoloed ?? []));
+    setStemVolumes(m.stemVolumes ?? []);
   }, [score]);
 
   useEffect(() => {
@@ -684,7 +733,18 @@ export function Room({ session, profile, onLeave }: Props) {
 
   // The admin's public URL (Admin → Settings), so an invite copied over the LAN still works for friends outside.
   const [publicUrl, setPublicUrl] = useState(location.origin);
-  useEffect(() => void getConfig().then((c) => c.baseUrl && setPublicUrl(c.baseUrl), () => {}), []);
+  const [stemsAvailable, setStemsAvailable] = useState(false);
+  useEffect(
+    () =>
+      void getConfig().then(
+        (c) => {
+          if (c.baseUrl) setPublicUrl(c.baseUrl);
+          setStemsAvailable(c.stems);
+        },
+        () => {},
+      ),
+    [],
+  );
   const inviteLink = `${publicUrl}/#/r/${session.roomId}`;
   const copyInvite = async () => {
     try {
@@ -864,7 +924,27 @@ export function Room({ session, profile, onLeave }: Props) {
                     </select>
                   </label>
                 )}
-                {original && <p className="banner note">Original audio is playing: mute, solo and volume only apply to the synth.</p>}
+                {source === 'stems' && stemsReady && (
+                  <>
+                    <h4 className="panel-sub">Stems</h4>
+                    <StemMixer
+                      names={stems.names}
+                      muted={stemMuted}
+                      soloed={stemSoloed}
+                      volumes={stemVolumes}
+                      onMute={(i) => changeMix({ sm: toggleSet(stemMuted, i) })}
+                      onSolo={(i) => changeMix({ ss: toggleSet(stemSoloed, i) })}
+                      onVolume={setStemVolume}
+                    />
+                    <h4 className="panel-sub">Tracks</h4>
+                  </>
+                )}
+                {original && (
+                  <p className="banner note">
+                    {source === 'stems' ? 'Stems are playing: the stem mixer above sets what you hear. ' : 'Original audio is playing: '}
+                    track mute, solo and volume only apply to the synth.
+                  </p>
+                )}
                 <ul className={`track-list ${original ? 'audio-off' : ''}`}>
                   {score.tracks.map((t) => (
                     <li key={t.index}>
@@ -1045,6 +1125,16 @@ export function Room({ session, profile, onLeave }: Props) {
               >
                 Original
               </button>
+              {stemsAvailable && (
+                <button
+                  className={source === 'stems' ? 'on' : ''}
+                  onClick={() => changeMix({ source: 'stems' })}
+                  disabled={!score}
+                  title={stemsReady ? 'Play the original split into stems: mute and solo vocals, drums, bass, guitar…' : 'Split the original recording into stems'}
+                >
+                  Stems
+                </button>
+              )}
             </div>
           </div>
   
@@ -1074,14 +1164,17 @@ export function Room({ session, profile, onLeave }: Props) {
         </footer>
       )}
 
-      {source === 'original' && score && (
+      {(source === 'original' || (source === 'stems' && stemsAvailable)) && score && currentTab && (
         <OriginalAudio
-          video={currentTab?.youtube}
+          video={currentTab.youtube}
+          stems={source === 'stems' ? { urls: stemUrls, panel: <StemsPanel session={session} tab={currentTab} /> } : undefined}
+          syncPoints={syncPoints}
+          onSaveSync={saveSyncPoints}
           getPlayOrder={getPlayOrder}
           getCurrentBar={getCurrentBar}
           onPlayer={onYtPlayer}
           onStateChange={onYtState}
-          onSave={(video) => currentTab && room.sendTabVideo(currentTab.id, video)}
+          onSave={(video) => room.sendTabVideo(currentTab.id, video)}
         />
       )}
       {texOpen && (

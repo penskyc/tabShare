@@ -13,3 +13,17 @@ services:
     # user: "1000:1000"           # run as your user (the data folder must be writable by it)
     # environment:
     #   SESSION_SECRET: change-me  # fixed secret, so room links survive a wiped data folder
+    #   STEMDECK_URL: http://stemdeck:8000  # with the stemdeck service below: the "Stems" audio source
+
+  # Optional: stem separation (vocals, drums, bass, guitar, piano, other) for the "Stems" audio source.
+  # Uncomment, and set STEMDECK_URL above. CPU by default (a few minutes a song); for an NVIDIA GPU add
+  # `runtime: nvidia`. No port is published: only tabShare talks to it. Pinned: its API is internal to StemDeck.
+  # stemdeck:
+  #   image: ghcr.io/stemdeckapp/stemdeck:0.20.0
+  #   container_name: stemdeck
+  #   restart: unless-stopped
+  #   environment:
+  #     STEMDECK_PERSIST_LIBRARY: "0" # tabShare copies the stems; leftovers expire
+  #   volumes:
+  #     - ./stemdeck/jobs:/app/jobs
+  #     - ./stemdeck/cache:/cache # model weights

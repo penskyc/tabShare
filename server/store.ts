@@ -6,7 +6,7 @@ import type { ChatMessage, LoopState, RoomAudio, SavedDrumSong, TabMeta } from '
 export const DATA_DIR = path.resolve(process.env.DATA_DIR ?? 'data');
 const ROOMS_FILE = path.join(DATA_DIR, 'rooms.json');
 const SECRET_FILE = path.join(DATA_DIR, 'secret');
-const FILES_DIR = path.join(DATA_DIR, 'files');
+export const FILES_DIR = path.join(DATA_DIR, 'files');
 
 export interface StoredRoom {
   id: string;

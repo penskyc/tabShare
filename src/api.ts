@@ -1,4 +1,4 @@
-import type { TabMeta } from '../shared/protocol';
+import type { TabMeta, TabStems } from '../shared/protocol';
 
 export interface Session {
   roomId: string;
@@ -78,6 +78,8 @@ export interface ServerConfig {
   baseUrl: string;
   tone3000ClientId: string | null;
   requireAdminForRooms: boolean;
+  /** A StemDeck sidecar is configured: the Stems audio source is available. */
+  stems: boolean;
   setupNeeded: boolean;
   version: string;
 }
@@ -230,6 +232,26 @@ export async function deleteTab(s: Session, tabId: string) {
     await fetch(`/api/rooms/${s.roomId}/tabs/${tabId}`, { method: 'DELETE', headers: { 'x-room-token': s.token } }),
   );
 }
+
+/** Makes stems from the tab's linked YouTube video, or from an audio file when one is given. */
+export async function startStems(s: Session, tabId: string, file?: File): Promise<TabStems> {
+  const q = file ? `name=${encodeURIComponent(file.name)}` : 'from=youtube';
+  return json(
+    await fetch(`/api/rooms/${s.roomId}/tabs/${tabId}/stems?${q}`, {
+      method: 'POST',
+      headers: { 'x-room-token': s.token, 'Content-Type': 'application/octet-stream' },
+      body: file,
+    }),
+  );
+}
+
+export async function deleteStems(s: Session, tabId: string) {
+  return json(await fetch(`/api/rooms/${s.roomId}/tabs/${tabId}/stems`, { method: 'DELETE', headers: { 'x-room-token': s.token } }));
+}
+
+/** A stem's URL (token in the query: <audio> can't send headers). */
+export const stemUrl = (s: Session, tabId: string, name: string) =>
+  `/api/rooms/${s.roomId}/tabs/${tabId}/stems/${name}.mp3?token=${encodeURIComponent(s.token)}`;
 
 export async function downloadTab(s: Session, tabId: string): Promise<ArrayBuffer> {
   const res = await fetch(`/api/rooms/${s.roomId}/tabs/${tabId}`, { headers: { 'x-room-token': s.token } });

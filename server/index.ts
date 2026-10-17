@@ -5,8 +5,13 @@ import express, { type Request, type Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
   ALLOWED_EXTENSIONS,
+  AUDIO_EXTENSIONS,
   browseUrl,
+  MAX_AUDIO_BYTES,
   MAX_UPLOAD_BYTES,
+  STEM_NAMES,
+  type StemName,
+  type SyncPoint,
   type BrowseState,
   type DrumShare,
   type ChatMessage,
@@ -35,6 +40,7 @@ import {
   type StoredRoom,
 } from './store.js';
 import { URL_RE, unfurl } from './unfurl.js';
+import { removeStems, startStems, stemFile, stemsEnabled, watchStems } from './stems.js';
 import { downloadSong, searchSongs } from './songsterr/index.js';
 import {
   adminSettings,
@@ -157,7 +163,7 @@ const downloadsDir = path.join(DATA_DIR, 'downloads');
 app.use('/downloads', express.static(downloadsDir, { cacheControl: false, setHeaders: (res) => res.setHeader('Cache-Control', 'no-cache') }));
 
 // Public client config. The TONE3000 publishable key (t3k_pub_…) is safe to expose; it's an OAuth client_id.
-app.get('/api/config', (_req, res) => void res.json({ ...publicSettings(), setupNeeded: needsSetup(), version: VERSION }));
+app.get('/api/config', (_req, res) => void res.json({ ...publicSettings(), stems: stemsEnabled(), setupNeeded: needsSetup(), version: VERSION }));
 
 // ---------- first-run setup ----------
 
@@ -264,6 +270,7 @@ app.get('/api/admin/rooms', (req, res) => {
 app.delete('/api/admin/rooms/:id', (req, res) => {
   if (!requireAdmin(req, res)) return;
   kickAll(req.params.id, 'room deleted');
+  for (const tab of getRoom(req.params.id)?.tabs ?? []) removeStems(req.params.id, tab);
   if (!deleteRoom(req.params.id)) return void res.status(404).json({ error: 'Room not found' });
   res.json({ ok: true });
 });
@@ -368,6 +375,7 @@ app.delete('/api/rooms/:id/tabs/:tabId', (req, res) => {
   if (idx < 0) return void res.status(404).json({ error: 'Tab not found' });
   const [tab] = room.tabs.splice(idx, 1);
   fs.rmSync(tabFilePath(room.id, tab), { force: true });
+  removeStems(room.id, tab);
   if (room.currentTabId === tab.id) {
     room.currentTabId = room.tabs[0]?.id ?? null;
     room.loop = null;
@@ -376,6 +384,73 @@ app.delete('/api/rooms/:id/tabs/:tabId', (req, res) => {
   broadcast(room.id, { type: 'tabs', tabs: room.tabs, currentTabId: room.currentTabId });
   res.json({ ok: true });
 });
+
+// ---------- stems (StemDeck sidecar) ----------
+
+const tabsChanged = (room: StoredRoom) => broadcast(room.id, { type: 'tabs', tabs: room.tabs, currentTabId: room.currentTabId });
+watchStems(tabsChanged);
+
+/** The tab for a stems request, or null after answering. */
+function stemsTab(req: Request, res: Response) {
+  const room = authed(req, res);
+  if (!room) return null;
+  const tab = room.tabs.find((t) => t.id === req.params.tabId);
+  if (!tab) return void res.status(404).json({ error: 'Tab not found' }), null;
+  return { room, tab };
+}
+
+// Make stems from the tab's YouTube video (?from=youtube) or from an uploaded audio file (raw body, ?name=).
+app.post('/api/rooms/:id/tabs/:tabId/stems', express.raw({ type: () => true, limit: MAX_AUDIO_BYTES }), async (req, res) => {
+  const t = stemsTab(req, res);
+  if (!t) return;
+  const { room, tab } = t;
+  if (!stemsEnabled()) return void res.status(404).json({ error: 'Stems are not set up on this server' });
+  if (tab.stems?.status === 'queued' || tab.stems?.status === 'running') return void res.status(409).json({ error: 'Stems are already being made' });
+  let src: Parameters<typeof startStems>[2];
+  if (req.query.from === 'youtube') {
+    if (!tab.youtube) return void res.status(400).json({ error: 'Link a YouTube video to this tab first' });
+    src = { youtube: tab.youtube.videoId };
+  } else {
+    const name = str(req.query.name, 200) || 'audio.mp3';
+    const ext = path.extname(name).slice(1).toLowerCase();
+    if (!AUDIO_EXTENSIONS.includes(ext)) return void res.status(400).json({ error: `Unsupported audio type .${ext}` });
+    const body = req.body as Buffer;
+    if (!Buffer.isBuffer(body) || body.length === 0) return void res.status(400).json({ error: 'Empty file' });
+    src = { file: body, name };
+  }
+  try {
+    await startStems(room, tab, src, tabsChanged);
+    res.json(tab.stems);
+  } catch (e) {
+    res.status(502).json({ error: `StemDeck: ${(e as Error).message}` });
+  }
+});
+
+app.get('/api/rooms/:id/tabs/:tabId/stems/:name.mp3', (req, res) => {
+  const t = stemsTab(req, res);
+  if (!t) return;
+  const name = req.params.name as StemName;
+  if (t.tab.stems?.status !== 'ready' || !t.tab.stems.names.includes(name)) return void res.status(404).json({ error: 'No such stem' });
+  res.sendFile(stemFile(t.room.id, t.tab, name), { headers: { 'Content-Type': 'audio/mpeg' } });
+});
+
+app.delete('/api/rooms/:id/tabs/:tabId/stems', (req, res) => {
+  const t = stemsTab(req, res);
+  if (!t) return;
+  removeStems(t.room.id, t.tab);
+  saveSoon();
+  tabsChanged(t.room);
+  res.json({ ok: true });
+});
+
+/** Sync points from a client: well-formed, at most 5000. */
+function cleanSyncPoints(v: unknown): SyncPoint[] {
+  const num = (v: unknown, min: number, max: number) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
+  return (Array.isArray(v) ? (v as SyncPoint[]) : [])
+    .filter((p) => p && num(p.barIndex, 0, 100000) && num(p.barOccurence, 0, 1000) && num(p.barPosition, 0, 1) && num(p.millisecondOffset, 0, 24 * 3600 * 1000))
+    .slice(0, 5000)
+    .map((p) => ({ barIndex: Math.floor(p.barIndex), barOccurence: Math.floor(p.barOccurence), barPosition: p.barPosition, millisecondOffset: p.millisecondOffset }));
+}
 
 // Static client in production.
 const distDir = path.resolve('dist');
@@ -493,13 +568,16 @@ wss.on('connection', (ws, req) => {
         if (!y) delete tab.youtube;
         else {
           if (typeof y.videoId !== 'string' || !/^[A-Za-z0-9_-]{11}$/.test(y.videoId)) break;
-          const num = (v: unknown, min: number, max: number) => typeof v === 'number' && Number.isFinite(v) && v >= min && v <= max;
-          const points = (Array.isArray(y.syncPoints) ? y.syncPoints : [])
-            .filter((p) => p && num(p.barIndex, 0, 100000) && num(p.barOccurence, 0, 1000) && num(p.barPosition, 0, 1) && num(p.millisecondOffset, 0, 24 * 3600 * 1000))
-            .slice(0, 5000)
-            .map((p) => ({ barIndex: Math.floor(p.barIndex), barOccurence: Math.floor(p.barOccurence), barPosition: p.barPosition, millisecondOffset: p.millisecondOffset }));
-          tab.youtube = { videoId: y.videoId, syncPoints: points };
+          tab.youtube = { videoId: y.videoId, syncPoints: cleanSyncPoints(y.syncPoints) };
         }
+        saveSoon();
+        broadcast(room.id, { type: 'tabs', tabs: room.tabs, currentTabId: room.currentTabId });
+        break;
+      }
+      case 'stemSync': {
+        const tab = room.tabs.find((t) => t.id === msg.tabId);
+        if (tab?.stems?.status !== 'ready' || tab.stems.from !== 'upload') break;
+        tab.stems.syncPoints = cleanSyncPoints(msg.syncPoints);
         saveSoon();
         broadcast(room.id, { type: 'tabs', tabs: room.tabs, currentTabId: room.currentTabId });
         break;
@@ -573,7 +651,12 @@ wss.on('connection', (ws, req) => {
             : [],
           metronome: msg.metronome === true,
           countIn: msg.countIn === true,
-          source: msg.source === 'original' ? 'original' : 'synth',
+          source: msg.source === 'original' || msg.source === 'stems' ? msg.source : 'synth',
+          stemMuted: ints(msg.stemMuted).filter((i) => i < STEM_NAMES.length),
+          stemSoloed: ints(msg.stemSoloed).filter((i) => i < STEM_NAMES.length),
+          stemVolumes: Array.isArray(msg.stemVolumes)
+            ? msg.stemVolumes.slice(0, STEM_NAMES.length).map((v) => (typeof v === 'number' && Number.isFinite(v) ? Math.min(2, Math.max(0, v)) : 1))
+            : [],
           by: me.peer.name,
         };
         broadcast(room.id, { type: 'mix', mix: lr.mix }, clientId);
