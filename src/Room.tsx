@@ -44,6 +44,22 @@ function writePref(k: string, v: string) {
   }
 }
 
+// The part a tab opens on, per person (`tabshare.defaultPart`, default bass).
+type Part = 'bass' | 'guitar' | 'drums';
+const PARTS: Array<[Part, string]> = [['bass', 'Bass'], ['guitar', 'Guitar'], ['drums', 'Drums']];
+const readPart = (): Part => {
+  const p = readPref('defaultPart');
+  return p === 'guitar' || p === 'drums' ? p : 'bass';
+};
+// First track of that part (GM 32–39 bass, 24–31 guitar, a percussion staff for drums); the first track if there's none.
+function partTrack(s: alphaTab.model.Score, part: Part) {
+  const t = s.tracks.find((t) => {
+    const prog = t.playbackInfo.program, drums = !!t.staves[0]?.isPercussion;
+    return part === 'drums' ? drums : !drums && (part === 'bass' ? prog >= 32 && prog <= 39 : prog >= 24 && prog <= 31);
+  });
+  return t?.index ?? 0;
+}
+
 /** True when the browser would currently block audio playback (no user gesture on this page yet). */
 function isAudioLocked() {
   const nav = navigator as Navigator & { getAutoplayPolicy?: (type: string) => string };
@@ -260,9 +276,7 @@ export function Room({ session, profile, onLeave }: Props) {
     offs.push(
       api.scoreLoaded.on((s) => {
         setScore(s);
-        // Open on the bass part (GM programs 32–39); the first track if there's none.
-        const bass = s.tracks.find((t) => t.playbackInfo.program >= 32 && t.playbackInfo.program <= 39 && !t.staves[0]?.isPercussion);
-        setVisibleTracks([bass?.index ?? 0]);
+        setVisibleTracks([partTrack(s, readPart())]);
         setMuted(new Set());
         setSoloed(new Set());
         setVolumes([]);
@@ -638,6 +652,12 @@ export function Room({ session, profile, onLeave }: Props) {
     if (v.includes(i) && v.length === 1) return; // keep at least one track shown
     changeMix({ tracks: v.includes(i) ? v.filter((x) => x !== i) : [...v, i].sort((a, b) => a - b) });
   };
+  const [defaultPart, setDefaultPart] = useState(readPart);
+  const pickDefaultPart = (p: Part) => {
+    setDefaultPart(p);
+    writePref('defaultPart', p);
+    if (score) changeMix({ tracks: [partTrack(score, p)] }); // show it now too, like picking that track
+  };
   const toggleSyncView = (on: boolean) => {
     setSyncView(on);
     syncViewRef.current = on;
@@ -911,6 +931,16 @@ export function Room({ session, profile, onLeave }: Props) {
               <>
                 <label className="small muted check-line" title="On: the tracks you see follow the jam. Off: show only the parts you play (mute, solo and volume still sync).">
                   <input type="checkbox" checked={syncView} onChange={(e) => toggleSyncView(e.target.checked)} /> Same track view as the jam
+                </label>
+                <label className="small muted sound-bank" title="The part every tab opens on for you (the first track if a tab doesn't have it)">
+                  Open tabs on
+                  <select value={defaultPart} onChange={(e) => pickDefaultPart(e.target.value as Part)}>
+                    {PARTS.map(([id, name]) => (
+                      <option key={id} value={id}>
+                        {name}
+                      </option>
+                    ))}
+                  </select>
                 </label>
                 {!lightOnly() && (
                   <label className="small muted sound-bank" title="The synth's instrument sounds. Bigger banks sound better; each downloads once, then it's cached.">
