@@ -138,6 +138,9 @@
       .shot-pair { display: grid; grid-template-columns: 1.6fr 1fr; gap: 16px; align-items: start; }
       .shot-pair .shot:last-child { margin-top: 48px; }
       .tall { max-width: 360px; justify-self: center; }
+      .film { max-width: 1100px; margin: 0 auto; }
+      .film h2 { text-align: center; margin-bottom: 28px; }
+      .film video { display: block; width: 100%; height: auto; aspect-ratio: 16 / 9; background: var(--bg); }
 
       /* latency comparison */
       .latency { display: grid; gap: 14px; margin: 6px 0 30px; max-width: 520px; }
@@ -211,6 +214,7 @@
     <nav>
       <a class="wordmark" href="#top">tab<span>Share</span></a>
       <div class="links">
+        <a href="#watch">Watch</a>
         <a href="#together">Play together</a>
         <a href="#call">Call</a>
         <a href="#practice">Practice</a>
@@ -285,6 +289,15 @@
         </svg>
       </div>
     </header>
+
+    <section class="bar-sec" id="watch">
+      <div class="film">
+        <h2>Twenty seconds, <em>one jam.</em></h2>
+        <div class="shot">
+          <video src="img/tabshare.mp4" poster="img/tabshare-poster.jpg" controls playsinline preload="metadata" aria-label="tabShare in 20 seconds: shared score, call, amp rig"></video>
+        </div>
+      </div>
+    </section>
 
     <section class="bar-sec" id="together">
       <span class="barno">1</span>
