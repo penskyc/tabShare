@@ -2,6 +2,8 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import type { CallState, Peer } from '../shared/protocol';
 import type { RoomConnection } from './useRoom';
 import { CallAudio, DEFAULT_LEVELS, loadMix, mixKey, saveMix, type MixLevels, type MixPart } from './callAudio';
+import { mediaErrorMessage, mediaOs, type MediaKind } from '../shared/mediaError';
+import { native } from './rig/native';
 
 // shortcut: STUN only — peers behind strict/symmetric NAT can't connect; add a TURN server (e.g. coturn) to ICE_SERVERS if that happens.
 const ICE_SERVERS: RTCIceServer[] = [{ urls: ['stun:stun.cloudflare.com:3478', 'stun:stun.l.google.com:19302'] }];
@@ -33,6 +35,10 @@ const savePref = (k: string, v: string) => {
     /* per-session only */
   }
 };
+
+/** Advice for a failed getUserMedia: an OS block, the site permission, or a busy device. */
+const mediaError = (e: unknown, kinds: MediaKind[]) =>
+  mediaErrorMessage(e as DOMException, kinds, { os: mediaOs(native?.platform, navigator.userAgent), app: !!native });
 
 export const callSupported = () => window.isSecureContext && !!navigator.mediaDevices?.getUserMedia;
 
@@ -263,31 +269,48 @@ export function useCall(
       const rigVoice = rigVoiceTrack();
       const audio = rigVoice ? false : audioConstraints(micId, originalSound);
       const fallbackAudio = rigVoice ? false : audioConstraints('', originalSound);
-      const stream = await navigator.mediaDevices.getUserMedia({
-        audio,
-        video: videoConstraints(camId),
-      }).catch((e) => {
+      const video = videoConstraints(camId);
+      // Kinds that couldn't be opened, with why (one refused kind must not keep you out of the call).
+      const failed: { kind: MediaKind; e: unknown }[] = [];
+      const stream = await navigator.mediaDevices.getUserMedia({ audio, video }).catch(async (e) => {
         // Saved device unplugged, or no camera: fall back to defaults / audio only.
         if (e.name === 'OverconstrainedError' || e.name === 'NotFoundError') {
           return navigator.mediaDevices.getUserMedia({ audio: fallbackAudio, video: true }).catch(() =>
             fallbackAudio ? navigator.mediaDevices.getUserMedia({ audio: fallbackAudio }) : new MediaStream(),
           );
         }
-        throw e;
+        // Blocked (OS privacy setting, antivirus) or busy: one kind may still work, so ask for each on its own.
+        const s = new MediaStream();
+        const tryKind = async (kind: MediaKind, c: MediaStreamConstraints) => {
+          try {
+            for (const t of (await navigator.mediaDevices.getUserMedia(c)).getTracks()) s.addTrack(t);
+          } catch (err) {
+            failed.push({ kind, e: err });
+          }
+        };
+        if (audio) await tryKind('microphone', { audio });
+        await tryKind('camera', { video });
+        return s;
       });
       micTrack.current = rigVoice ?? stream.getAudioTracks()[0] ?? null;
       camTrack.current = stream.getVideoTracks()[0] ?? null;
+      if (!micTrack.current && !camTrack.current && failed.length) {
+        const same = failed.every((f) => (f.e as DOMException).name === (failed[0].e as DOMException).name);
+        setError(same ? mediaError(failed[0].e, failed.map((f) => f.kind)) : failed.map((f) => mediaError(f.e, [f.kind])).join(' '));
+        return;
+      }
+      const hasMic = !!micTrack.current;
       const hasCam = !!camTrack.current;
-      setMic(true);
+      setMic(hasMic);
       setCam(hasCam);
       setScreen(false);
       setInCall(true);
       syncTracks();
-      announce({ mic: true, cam: hasCam, screen: false });
+      announce({ mic: hasMic, cam: hasCam, screen: false });
       refreshDevices(); // labels are only visible after permission is granted
+      if (failed.length) setError(failed.map((f) => `Joined without your ${f.kind}. ${mediaError(f.e, [f.kind])}`).join(' '));
     } catch (e) {
-      const err = e as DOMException;
-      setError(err.name === 'NotAllowedError' ? 'Microphone/camera permission was blocked. Allow it in the address bar and try again.' : err.message);
+      setError(mediaError(e, voiceRef.current ? ['camera'] : ['camera', 'microphone']));
     }
   }, [micId, camId, speakerId, originalSound, audioConstraints, syncTracks, announce, refreshDevices]);
 
@@ -312,8 +335,20 @@ export function useCall(
 
   const state = (patch: Partial<CallState>): CallState => ({ mic, cam, screen, ...patch });
 
-  const toggleMic = () => {
+  const toggleMic = async () => {
     const next = !mic;
+    // Joined without a mic (it was blocked): ask for it again now.
+    if (next && !micTrack.current && !voiceRef.current) {
+      try {
+        const s = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints(micId, originalSound) });
+        micTrack.current = s.getAudioTracks()[0];
+        setError(null);
+        syncTracks();
+      } catch (e) {
+        setError(mediaError(e, ['microphone']));
+        return;
+      }
+    }
     if (micTrack.current) micTrack.current.enabled = next;
     setMic(next);
     announce(state({ mic: next }));
@@ -335,7 +370,7 @@ export function useCall(
       syncTracks();
       announce(state({ cam: true }));
     } catch (e) {
-      setError(`Camera unavailable: ${(e as Error).message}`);
+      setError(mediaError(e, ['camera']));
     }
   };
 
@@ -377,7 +412,7 @@ export function useCall(
       micTrack.current.enabled = mic;
       syncTracks();
     } catch (e) {
-      setError(`Microphone unavailable: ${(e as Error).message}`);
+      setError(mediaError(e, ['microphone']));
     }
   };
 
@@ -439,7 +474,7 @@ export function useCall(
       camTrack.current = s.getVideoTracks()[0];
       syncTracks();
     } catch (e) {
-      setError(`Camera unavailable: ${(e as Error).message}`);
+      setError(mediaError(e, ['camera']));
     }
   };
 
