@@ -29,6 +29,9 @@ import { StemMixer, StemsPanel } from './Stems';
 const PLAYING = 1; // alphaTab.synth.PlayerState.Playing
 type Mode = 'tab' | 'practice' | 'drums' | 'browser';
 
+// Off since 2026-11: Songsterr's API answers 403 to non-browser clients. Turn back on if we get API access.
+const TAB_SEARCH = false;
+
 function readPref(k: string) {
   try {
     return localStorage.getItem(`tabshare.${k}`);
@@ -883,16 +886,22 @@ export function Room({ session, profile, onLeave }: Props) {
                 ✎ Write
               </button>
             </div>
-            <SongsterrSearch
-              session={session}
-              by={profile.name}
-              onImported={(tab) => {
-                room.setTab(tab.id);
-                setToast(`Added ${tab.title ?? tab.fileName} from Songsterr`);
-              }}
-            />
+            {TAB_SEARCH && (
+              <SongsterrSearch
+                session={session}
+                by={profile.name}
+                onImported={(tab) => {
+                  room.setTab(tab.id);
+                  setToast(`Added ${tab.title ?? tab.fileName} from Songsterr`);
+                }}
+              />
+            )}
             <ul className="tab-list">
-              {room.tabs.length === 0 && <li className="muted small">Library is empty. Search for a tab above, or add a Guitar Pro file.</li>}
+              {room.tabs.length === 0 && (
+                <li className="muted small">
+                  Library is empty. {TAB_SEARCH ? 'Search for a tab above, or add' : 'Add'} a Guitar Pro file.
+                </li>
+              )}
               {room.tabs.map((t) => (
                 <li key={t.id} className={t.id === room.currentTabId ? 'active' : ''}>
                   <button
