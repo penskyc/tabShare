@@ -1,4 +1,5 @@
-import type { TabMeta, TabStems } from '../shared/protocol';
+import type { Idea, TabMeta, TabStems } from '../shared/protocol';
+import type { PendingTake } from './ideas/pending';
 
 export interface Session {
   roomId: string;
@@ -257,4 +258,59 @@ export async function downloadTab(s: Session, tabId: string): Promise<ArrayBuffe
   const res = await fetch(`/api/rooms/${s.roomId}/tabs/${tabId}`, { headers: { 'x-room-token': s.token } });
   if (!res.ok) throw new Error(`Could not load tab (${res.status})`);
   return res.arrayBuffer();
+}
+
+// ---------- ideas (recorded takes) ----------
+
+/** An upload error with the HTTP status (0 = network), so callers can tell "retry later" from "refused". */
+export class UploadError extends Error {
+  constructor(
+    message: string,
+    readonly status: number,
+  ) {
+    super(message);
+  }
+}
+
+/** Uploads a finished (or recovered) take. The take's id makes a retry return the same idea. */
+export async function uploadIdea(s: Session, take: PendingTake, blob: Blob): Promise<Idea> {
+  const q = new URLSearchParams({
+    id: take.id,
+    tags: JSON.stringify(take.tags),
+    by: take.by,
+    durationMs: String(Math.max(1, Math.round(take.durationMs))),
+    createdAt: String(take.createdAt),
+  });
+  if (take.label) q.set('label', take.label);
+  if (take.model) q.set('model', take.model);
+  let res: Response;
+  try {
+    res = await fetch(`/api/rooms/${s.roomId}/ideas?${q}`, {
+      method: 'POST',
+      headers: { 'x-room-token': s.token, 'Content-Type': take.mime },
+      body: blob,
+    });
+  } catch (e) {
+    throw new UploadError((e as Error).message || 'Network error', 0);
+  }
+  const body = await res.json().catch(() => ({}));
+  if (!res.ok) throw new UploadError(body.error ?? `Upload failed (${res.status})`, res.status);
+  return body as Idea;
+}
+
+/** An idea's audio URL (token in the query: <audio> can't send headers). */
+export const ideaUrl = (s: Session, id: string) => `/api/rooms/${s.roomId}/ideas/${id}?token=${encodeURIComponent(s.token)}`;
+
+export async function updateIdea(s: Session, id: string, patch: { label?: string; tags?: string[] }): Promise<Idea> {
+  return json(
+    await fetch(`/api/rooms/${s.roomId}/ideas/${id}`, {
+      method: 'PATCH',
+      headers: { 'x-room-token': s.token, 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    }),
+  );
+}
+
+export async function deleteIdea(s: Session, id: string): Promise<void> {
+  await json(await fetch(`/api/rooms/${s.roomId}/ideas/${id}`, { method: 'DELETE', headers: { 'x-room-token': s.token } }));
 }
