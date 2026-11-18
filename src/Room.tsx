@@ -1,3 +1,4 @@
+import { Ideas } from './Ideas';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as alphaTab from '@coderline/alphatab';
 import { LayoutMode, PlayerMode } from '@coderline/alphatab';
@@ -121,7 +122,7 @@ export function Room({ session, profile, onLeave }: Props) {
   const [volumes, setVolumes] = useState<number[]>([]);
   // Jam sync defaults on: shared playback is the point of a room.
   const [jam, setJam] = useState(true);
-  const [panel, setPanel] = useState<'tabs' | 'tracks' | 'rig' | 'chat'>('tabs');
+  const [panel, setPanel] = useState<'tabs' | 'tracks' | 'rig' | 'ideas' | 'chat'>('tabs');
   const [sideW, setSideW] = useState(() => Number(readPref('sideW')) || 280);
   const [sideOpen, setSideOpen] = useState(() => readPref('sideOpen') !== '0');
   const toggleSide = (open: boolean) => {
@@ -837,6 +838,7 @@ export function Room({ session, profile, onLeave }: Props) {
                 ['tabs', '📚', 'Library'],
                 ['tracks', '🎚', 'Tracks'],
                 ['rig', '🎸', 'Rig'],
+                ['ideas', '💡', 'Ideas'],
                 ['chat', '💬', 'Chat'],
               ] as const
             ).map(([p, icon, label]) => (
@@ -856,9 +858,9 @@ export function Room({ session, profile, onLeave }: Props) {
           <>
         <div className="side-resize" onPointerDown={startResize} title="Drag to resize" />
         <nav className="side-tabs">
-          {(['tabs', 'tracks', 'rig', 'chat'] as const).map((p) => (
+          {(['tabs', 'tracks', 'rig', 'ideas', 'chat'] as const).map((p) => (
             <button key={p} className={panel === p ? 'on' : ''} onClick={() => setPanel(p)}>
-              {p === 'tabs' ? 'Library' : p === 'tracks' ? 'Tracks' : p === 'rig' ? (rig.on ? 'Rig ●' : 'Rig') : `Chat${room.chat.length ? ` · ${room.chat.length}` : ''}`}
+              {p === 'tabs' ? 'Library' : p === 'tracks' ? 'Tracks' : p === 'rig' ? (rig.on ? 'Rig ●' : 'Rig') : p === 'ideas' ? 'Ideas' : `Chat${room.chat.length ? ` · ${room.chat.length}` : ''}`}
             </button>
           ))}
           <button className="side-collapse" onClick={() => (narrow ? setDrawer(false) : toggleSide(false))} title={narrow ? 'Close' : 'Collapse panel'}>
@@ -1026,6 +1028,7 @@ export function Room({ session, profile, onLeave }: Props) {
         )}
 
         {panel === 'rig' && <RigPanel rig={rig} inCall={call.inCall} roomAudio={roomAudio} />}
+        {panel === 'ideas' && <Ideas session={session} ideas={room.ideas} rig={rig} me={profile.name} openRig={() => setPanel('rig')} />}
         {panel === 'chat' && <Chat room={room} />}
           </>
         )}

@@ -1,5 +1,5 @@
 /** 16-bit PCM WAV from one Float32Array per channel (equal lengths), samples clamped to [-1, 1]. */
-export function encodeWav(channels: Float32Array[], sampleRate: number): Uint8Array {
+export function encodeWav(channels: Float32Array[], sampleRate: number): Uint8Array<ArrayBuffer> {
   const nch = channels.length;
   const frames = channels[0]?.length ?? 0;
   const dataBytes = frames * nch * 2;
