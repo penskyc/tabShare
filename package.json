@@ -14,7 +14,7 @@
     "soundfonts": "node scripts/fetch-soundfonts.mjs"
   },
   "dependencies": {
-    "@coderline/alphatab": "^1.8.4",
+    "@coderline/alphatab": "^1.9.0",
     "@opendaw/nam-wasm": "^1.2.0",
     "express": "^5.3.0",
     "fflate": "^0.8.3",
@@ -24,7 +24,7 @@
     "ws": "^8.22.0"
   },
   "devDependencies": {
-    "@coderline/alphatab-vite": "^1.8.4",
+    "@coderline/alphatab-vite": "^1.9.0",
     "@types/express": "^5.0.6",
     "@types/node": "^26.6.5",
     "@types/react": "^19.3.0",
