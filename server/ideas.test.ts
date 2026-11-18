@@ -65,7 +65,6 @@ test('addIdea rejects bad input and writes nothing', () => {
     [q({ id: '../../etc' }), body, 'audio/webm'],
     [q(), Buffer.alloc(0), 'audio/webm'],
     [q({ durationMs: '0' }), body, 'audio/webm'],
-    [q({ durationMs: String(15 * 60 * 1000 + 31_000) }), body, 'audio/webm'],
     [q({ tags: JSON.stringify(Array.from({ length: 11 }, (_, i) => `t${i}`)) }), body, 'audio/webm'],
     [q({ tags: 'not json' }), body, 'audio/webm'],
     [q({ label: 'x'.repeat(101) }), body, 'audio/webm'],
@@ -98,4 +97,11 @@ test('removeIdea deletes the file and the entry', () => {
   assert.equal(fs.existsSync(file), false);
   assert.deepEqual(room.ideas, []);
   assert.equal(ideas.removeIdea(room, r.idea.id), false);
+});
+
+test('addIdea clamps an overlong duration instead of refusing a real take', () => {
+  const room = store.createRoom('Ideas', 'pw12');
+  const r = ideas.addIdea(room, q({ durationMs: String(16 * 60 * 1000) }), body, 'audio/webm');
+  assert.ok(typeof r !== 'string', String(r));
+  assert.equal(r.idea.durationMs, 15 * 60 * 1000 + 30_000);
 });

@@ -67,6 +67,8 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
         const status = e instanceof UploadError ? e.status : 0;
         const temporary = status === 0 || status === 408 || status === 429 || status >= 500;
         if (!temporary) {
+          take.failed = true;
+          await putTake(take);
           setState(take, 'failed');
           return;
         }
@@ -88,6 +90,10 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
     let later = false;
     for (const t of takes) {
       if (t.id === rec.current?.take.id || inFlight.current.has(t.id) || retries.current.has(t.id)) continue;
+      if (t.failed) {
+        setState(t, 'failed');
+        continue;
+      }
       if (!t.done && Date.now() - t.updatedAt < STALE_MS) {
         later = true;
         continue;
@@ -141,6 +147,8 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
       take.updatedAt = Date.now();
       if (recorder.mimeType) take.mime = recorder.mimeType;
       state.writes = state.writes.then(() => addChunk(take.id, seq, e.data)).then(() => putTake(take));
+      // The cap is also checked here: chunks keep coming when timers are throttled (hidden page, minimized app).
+      if (take.durationMs >= MAX_IDEA_MS && recorder.state === 'recording') recorder.stop();
     };
     recorder.onstop = () => {
       take.durationMs = performance.now() - state.started;
@@ -184,10 +192,31 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
   const retry = useCallback(
     (id: string) => {
       const p = pending.find((x) => x.take.id === id);
-      if (p) void upload(p.take);
+      if (!p) return;
+      p.take.failed = false;
+      void putTake(p.take).then(() => upload(p.take));
     },
     [pending, upload],
   );
+
+  /** Throw a take away (it never reached the server). */
+  const discard = useCallback(
+    (id: string) => {
+      const p = pending.find((x) => x.take.id === id);
+      const r = retries.current.get(id);
+      if (r) clearTimeout(r.timer);
+      retries.current.delete(id);
+      void dropTake(id);
+      if (p) setState(p.take, null);
+    },
+    [pending, setState],
+  );
+
+  /** The take's audio as recorded (for takes the server refused). */
+  const takeAudio = useCallback(async (id: string) => {
+    const p = pending.find((x) => x.take.id === id);
+    return p ? takeBlob(p.take) : null;
+  }, [pending]);
 
   return {
     canRecord: !!stream && typeof MediaRecorder !== 'undefined',
@@ -197,6 +226,8 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
     stop,
     pending: [...pending].sort((a, b) => b.take.createdAt - a.take.createdAt),
     retry,
+    discard,
+    takeAudio,
     protectedStorage,
   };
 }

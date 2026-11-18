@@ -17,6 +17,8 @@ export interface PendingTake {
   done: boolean;
   /** Last write (a chunk or the stop): a take that isn't done and hasn't been written for a while is a crash leftover. */
   updatedAt: number;
+  /** The server refused it (not a network problem): kept for Download/Discard, never re-sent automatically. */
+  failed?: boolean;
 }
 
 const DB = 'tabshare-ideas';

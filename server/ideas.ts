@@ -26,8 +26,11 @@ export function addIdea(room: StoredRoom, q: Record<string, unknown>, body: Buff
   const type = baseMime(mime);
   if (!type) return 'Unsupported audio type';
   if (!Buffer.isBuffer(body) || body.length === 0) return 'Empty recording';
-  const durationMs = Math.round(Number(q.durationMs));
-  if (!Number.isFinite(durationMs) || durationMs < 1 || durationMs > MAX_IDEA_MS + DURATION_SLACK_MS) return 'Bad duration';
+  // A take that was really recorded is never refused over its length: an overrun (a throttled timer in a hidden page)
+  // is clamped.
+  const rawMs = Math.round(Number(q.durationMs));
+  if (!Number.isFinite(rawMs) || rawMs < 1) return 'Bad duration';
+  const durationMs = Math.min(rawMs, MAX_IDEA_MS + DURATION_SLACK_MS);
   let tags: string[] | null = [];
   if (q.tags !== undefined && q.tags !== '') {
     try {

@@ -28,3 +28,16 @@ export function encodeWav(channels: Float32Array[], sampleRate: number): Uint8Ar
     }
   return out;
 }
+
+/** The same bytes as encodeWav, as a header part + data parts of `frames` frames each (no second full-size copy). */
+export function encodeWavParts(channels: Float32Array[], sampleRate: number, frames = 48000): Uint8Array<ArrayBuffer>[] {
+  const total = channels[0]?.length ?? 0;
+  const header = encodeWav(channels.map(() => new Float32Array(0)), sampleRate).slice(0, 44);
+  const v = new DataView(header.buffer);
+  const dataBytes = total * channels.length * 2;
+  v.setUint32(4, 36 + dataBytes, true);
+  v.setUint32(40, dataBytes, true);
+  const parts: Uint8Array<ArrayBuffer>[] = [header];
+  for (let at = 0; at < total; at += frames) parts.push(encodeWav(channels.map((c) => c.subarray(at, Math.min(total, at + frames))), sampleRate).slice(44));
+  return parts;
+}

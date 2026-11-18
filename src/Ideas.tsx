@@ -2,10 +2,11 @@
 // label, tag and date; play, rename, tag, download (WAV) or delete.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import type { Idea } from '../shared/protocol';
-import { allTags, filterIdeas, safeFileName } from '../shared/ideas';
-import { encodeWav } from '../shared/wav';
+import { allTags, baseMime, filterIdeas, ideaExt, safeFileName } from '../shared/ideas';
+import { encodeWavParts } from '../shared/wav';
 import { deleteIdea, ideaUrl, updateIdea, type Session } from './api';
 import { getAudioContext } from './rig/audioContext';
+import { native } from './rig/native';
 import type { RigControls } from './rig/useRig';
 import type { PendingState, Recorder } from './ideas/useRecorder';
 
@@ -15,6 +16,18 @@ const fmt = (ms: number) => {
 };
 const fmtDate = (t: number) =>
   new Date(t).toLocaleString('en-US', { month: 'short', day: 'numeric', year: new Date(t).getFullYear() === new Date().getFullYear() ? undefined : 'numeric' });
+
+/** WKWebView (iOS app) has no download handler: a download link does nothing there. */
+const CAN_DOWNLOAD = native?.platform !== 'ios';
+
+function saveFile(blob: Blob, name: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
 const PENDING_TEXT: Record<PendingState, string> = {
   saving: 'Saving…',
@@ -106,6 +119,24 @@ export function Ideas({ session, ideas, rig, rec, openRig }: Props) {
                 </button>
               )}
             </div>
+            {state === 'failed' && (
+              <div className="idea-actions">
+                {CAN_DOWNLOAD && (
+                  <button
+                    className="link-btn"
+                    onClick={async () => {
+                      const blob = await rec.takeAudio(take.id);
+                      if (blob) saveFile(blob, `${safeFileName(take.label ?? 'idea')}.${ideaExt(baseMime(take.mime) ?? 'audio/webm')}`);
+                    }}
+                  >
+                    Download
+                  </button>
+                )}
+                <button className="link-btn danger" onClick={() => rec.discard(take.id)}>
+                  Discard
+                </button>
+              </div>
+            )}
           </li>
         ))}
         {shown.map((idea) => (
@@ -215,12 +246,7 @@ function IdeaRow({
       if (!res.ok) throw new Error(`Download failed (${res.status})`);
       const buf = await getAudioContext().decodeAudioData(await res.arrayBuffer());
       const channels = Array.from({ length: buf.numberOfChannels }, (_, c) => buf.getChannelData(c));
-      const url = URL.createObjectURL(new Blob([encodeWav(channels, buf.sampleRate)], { type: 'audio/wav' }));
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `${safeFileName(idea.label)}.wav`;
-      a.click();
-      setTimeout(() => URL.revokeObjectURL(url), 10_000);
+      saveFile(new Blob(encodeWavParts(channels, buf.sampleRate), { type: 'audio/wav' }), `${safeFileName(idea.label)}.wav`);
     } catch (e) {
       onError((e as Error).message);
     } finally {
@@ -299,9 +325,11 @@ function IdeaRow({
         </datalist>
       </div>
       <div className="idea-actions">
-        <button className="link-btn" onClick={download} disabled={busy}>
-          {busy ? 'Preparing…' : 'Download'}
-        </button>
+        {CAN_DOWNLOAD && (
+          <button className="link-btn" onClick={download} disabled={busy}>
+            {busy ? 'Preparing…' : 'Download'}
+          </button>
+        )}
         {confirmDelete ? (
           <span className="small">
             Delete?{' '}
