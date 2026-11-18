@@ -549,6 +549,8 @@ export function useRig() {
     audioHealth,
     /** Processed instrument signal for the call (null when the rig is off or not sending). */
     callStream: sendToCall ? instrumentStream : null,
+    /** Processed instrument signal for the Ideas recorder (null when the rig is off; independent of Send to call). */
+    recordStream: on ? instrumentStream : null,
     /** iOS app with the rig on: replaces the mic in the call (null otherwise). */
     voiceStream,
     /** iOS app: the voice input picker applies (iOS uses one input device, so voice comes from the interface). */
