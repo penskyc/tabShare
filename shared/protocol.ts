@@ -110,6 +110,28 @@ export interface SavedDrumSong {
   at: number;
 }
 
+/** A recorded idea (Ideas panel): the rig's processed instrument, saved to the room. */
+export interface Idea {
+  id: string;
+  label: string;
+  tags: string[];
+  createdAt: number;
+  /** Name of the person who recorded it. */
+  by: string;
+  durationMs: number;
+  /** Amp model loaded when recording started. */
+  model: string | null;
+  /** Base mime type, one of IDEA_MIMES. */
+  mime: string;
+  size: number;
+}
+
+export const IDEA_MIMES = ['audio/webm', 'audio/mp4', 'audio/ogg'] as const;
+export type IdeaMime = (typeof IDEA_MIMES)[number];
+/** Longest take: recording stops and saves at 15 minutes. */
+export const MAX_IDEA_MS = 15 * 60 * 1000;
+export const MAX_IDEA_BYTES = 20 * 1024 * 1024;
+
 /** Shared in jam mode: which tracks are shown, muted and soloed (track indexes), plus metronome and count-in. */
 export interface MixState {
   tracks: number[];
@@ -178,6 +200,7 @@ export interface RoomSnapshot {
   browse: BrowseState | null;
   drums: DrumShare | null;
   drumSongs: SavedDrumSong[];
+  ideas: Idea[];
   chat: ChatMessage[];
 }
 
@@ -214,6 +237,7 @@ export type ServerMessage =
   | { type: 'browse'; browse: BrowseState | null }
   | { type: 'drums'; state: DrumShare | null }
   | { type: 'drumSongs'; songs: SavedDrumSong[] }
+  | { type: 'ideas'; ideas: Idea[] }
   | { type: 'chat'; message: ChatMessage }
   | { type: 'chatPreview'; id: string; preview: LinkPreview }
   | { type: 'rtc'; from: string; data: unknown }
