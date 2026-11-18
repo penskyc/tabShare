@@ -178,7 +178,7 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
     if (rec.current && rec.current.stream !== stream) stop();
   }, [stream, stop]);
 
-  // Leaving the room (unmount) mid-take: stop so the take saves and uploads.
+  // Leaving the room (Room unmounts) mid-take: stop so the take saves and uploads.
   useEffect(() => () => stop(), [stop]);
 
   const retry = useCallback(
@@ -200,3 +200,5 @@ export function useRecorder(opts: { session: Session; stream: MediaStream | null
     protectedStorage,
   };
 }
+
+export type Recorder = ReturnType<typeof useRecorder>;

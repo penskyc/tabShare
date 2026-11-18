@@ -122,6 +122,26 @@ try {
   if (!/· input \d/.test(tunerSource)) fail(`tuner isn't on the engine tap: "${tunerSource}"`);
   else console.log('tuner: engine tap,', tunerSource);
   await page.getByRole('button', { name: 'Close tuner' }).click();
+  // Ideas: record the engine's processed signal for 2 s; the take uploads and plays back.
+  await page.locator('.side-tabs button', { hasText: /^Ideas/ }).click();
+  const ideasBefore = await page.locator('.ideas-list li.idea:not(.pending)').count();
+  await page.getByRole('button', { name: 'Record an idea' }).click();
+  await page.waitForTimeout(2200);
+  await page.getByRole('button', { name: 'Stop recording' }).click();
+  await page.waitForFunction((n) => document.querySelectorAll('.ideas-list li.idea:not(.pending)').length === n + 1, ideasBefore, { timeout: 10000 }).catch(() => {});
+  const newIdea = page.locator('.ideas-list li.idea:not(.pending)').first();
+  if ((await page.locator('.ideas-list li.idea:not(.pending)').count()) !== ideasBefore + 1) fail('ideas: the take did not upload');
+  else {
+    await newIdea.locator('.idea-play').click();
+    await page.waitForTimeout(1200);
+    const pos = await newIdea.locator('.idea-player .mono').textContent();
+    await newIdea.locator('.idea-play').click();
+    if (pos === '0:00' && !(await newIdea.locator('.idea-player input').evaluate((el) => Number(el.value) > 0))) fail('ideas: the take does not play');
+    else console.log('ideas: recorded, uploaded, plays');
+    await newIdea.getByRole('button', { name: 'Delete' }).click();
+    await newIdea.getByRole('button', { name: 'Yes' }).click();
+  }
+  await page.locator('.side-tabs button', { hasText: /^Rig/ }).click();
   // VST3 (if the addon is built): add a free plugin through the UI, wait for it to load, open its window.
   const vstPicker = page.getByLabel('VST3 plugin');
   if (await vstPicker.count()) {

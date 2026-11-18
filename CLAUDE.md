@@ -12,7 +12,7 @@ play/pause/seek/speed plus the whole mix (tracks, mute, solo, volume, metronome,
 previews; mesh WebRTC **video/voice call** (device pickers, mute, camera, screen share, "original sound"); **room audio**
 (desktop apps hear each other's instruments peer to peer via SonoBus's networking); **instrument
 rig**: audio-interface input → NAM amp model (WASM) → cab IR → monitor + mixed into the call, with local `.nam` files or
-**TONE3000** browsing and a capture dropdown; resizable/collapsible side panel; `#/admin` room management; a **desktop app** (`desktop/`, Electron, Windows +
+**TONE3000** browsing and a capture dropdown; **Ideas** (one-tap recordings of the rig, saved to the room); resizable/collapsible side panel; `#/admin` room management; a **desktop app** (`desktop/`, Electron, Windows +
 macOS) that loads the live site and runs the rig through a native **ASIO** (Windows) / **Core Audio** (macOS) engine.
 
 ## Layout
@@ -84,6 +84,19 @@ macOS) that loads the live site and runs the rig through a native **ASIO** (Wind
   engine lists names from the registry and loads only the picked driver (`devices` + `probe`). Probe:
   `.playwright-mcp/asio4all-mic.mjs`.
 - `desktop/picker.html` + `picker-preload.cjs`: screen-share picker (thumbnails of screens + windows, tabShare's own windows excluded, screens labelled with resolution and "main").
+- **Ideas** (side panel 💡, between Rig and Chat): records the rig's processed signal (`rig.recordStream` = the
+  `instrumentStream` while the rig is on, both the Web Audio and native-engine paths) with `MediaRecorder` (webm/opus,
+  WebKit mp4), 2 s timeslice. `src/ideas/useRecorder.ts` lives in Room (a take survives panel switches; the tab says
+  "Ideas ●"), stops on the button, the 15 min cap (`MAX_IDEA_MS`) or a new/null stream (rig off/restart).
+  `src/ideas/pending.ts`: every chunk goes to IndexedDB (`tabshare-ideas`) first; the take uploads on stop and is
+  dropped only after the server confirms; leftovers (reload/crash; not-done takes idle ≥ 10 s, so another tab's live
+  take is left alone) upload when the room opens; retries 2/5/15/30/60 s. Server `server/ideas.ts`:
+  `StoredRoom.ideas`, files `files/<room>/ideas/<id>.<ext>`, `POST /api/rooms/:id/ideas` (raw body, metadata in query,
+  same id = same idea), GET (Range), PATCH label/tags, DELETE, `ideas` WS broadcast, `welcome.room.ideas`. Labels are
+  made client-side (local time; the server runs in UTC). Download = WAV encoded in the page (`shared/wav.ts`). Shared
+  rules in `shared/ideas.ts`. Tests: `shared/ideas.test.ts`, `shared/wav.test.ts`, `server/ideas.test.ts`,
+  `.playwright-mcp/ideas.mjs` (2 users, prod build, crash + failed upload + delete-while-playing), desktop smoke step.
+  Spec/plan in `docs/superpowers/`.
 - `src/App.tsx`: hash routing (`#/r/<code>`, `#/admin`) and the lobby (create/join).
 - `src/Admin.tsx`: admin page (list rooms with who's online, change a room's password, delete a room).
 

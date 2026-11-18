@@ -1,4 +1,5 @@
 import { Ideas } from './Ideas';
+import { useRecorder } from './ideas/useRecorder';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type * as alphaTab from '@coderline/alphatab';
 import { LayoutMode, PlayerMode } from '@coderline/alphatab';
@@ -97,6 +98,7 @@ interface Props {
 export function Room({ session, profile, onLeave }: Props) {
   const room = useRoom(session, profile);
   const rig = useRig();
+  const ideasRec = useRecorder({ session, stream: rig.recordStream, by: profile.name, model: rig.model?.name ?? null });
   const roomAudio = useRoomAudio(room, rig);
   const call = useCall(room, rig.callStream, rig.voiceStream, roomAudio.linkedClientIds);
   const scoreRef = useRef<ScoreViewHandle>(null);
@@ -860,7 +862,7 @@ export function Room({ session, profile, onLeave }: Props) {
         <nav className="side-tabs">
           {(['tabs', 'tracks', 'rig', 'ideas', 'chat'] as const).map((p) => (
             <button key={p} className={panel === p ? 'on' : ''} onClick={() => setPanel(p)}>
-              {p === 'tabs' ? 'Library' : p === 'tracks' ? 'Tracks' : p === 'rig' ? (rig.on ? 'Rig ●' : 'Rig') : p === 'ideas' ? 'Ideas' : `Chat${room.chat.length ? ` · ${room.chat.length}` : ''}`}
+              {p === 'tabs' ? 'Library' : p === 'tracks' ? 'Tracks' : p === 'rig' ? (rig.on ? 'Rig ●' : 'Rig') : p === 'ideas' ? (ideasRec.recording ? 'Ideas ●' : 'Ideas') : `Chat${room.chat.length ? ` · ${room.chat.length}` : ''}`}
             </button>
           ))}
           <button className="side-collapse" onClick={() => (narrow ? setDrawer(false) : toggleSide(false))} title={narrow ? 'Close' : 'Collapse panel'}>
@@ -1028,7 +1030,7 @@ export function Room({ session, profile, onLeave }: Props) {
         )}
 
         {panel === 'rig' && <RigPanel rig={rig} inCall={call.inCall} roomAudio={roomAudio} />}
-        {panel === 'ideas' && <Ideas session={session} ideas={room.ideas} rig={rig} me={profile.name} openRig={() => setPanel('rig')} />}
+        {panel === 'ideas' && <Ideas session={session} ideas={room.ideas} rig={rig} rec={ideasRec} openRig={() => setPanel('rig')} />}
         {panel === 'chat' && <Chat room={room} />}
           </>
         )}

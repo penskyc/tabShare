@@ -7,7 +7,7 @@ import { encodeWav } from '../shared/wav';
 import { deleteIdea, ideaUrl, updateIdea, type Session } from './api';
 import { getAudioContext } from './rig/audioContext';
 import type { RigControls } from './rig/useRig';
-import { useRecorder, type PendingState } from './ideas/useRecorder';
+import type { PendingState, Recorder } from './ideas/useRecorder';
 
 const fmt = (ms: number) => {
   const s = Math.max(0, Math.round(ms / 1000));
@@ -26,12 +26,12 @@ interface Props {
   session: Session;
   ideas: Idea[];
   rig: RigControls;
-  me: string;
+  /** Lives in Room, so a take keeps recording while other panels are open. */
+  rec: Recorder;
   openRig: () => void;
 }
 
-export function Ideas({ session, ideas, rig, me, openRig }: Props) {
-  const rec = useRecorder({ session, stream: rig.recordStream, by: me, model: rig.model?.name ?? null });
+export function Ideas({ session, ideas, rig, rec, openRig }: Props) {
   const [query, setQuery] = useState('');
   const [tag, setTag] = useState<string | null>(null);
   const [playing, setPlaying] = useState<string | null>(null);
@@ -239,7 +239,7 @@ function IdeaRow({
   };
 
   return (
-    <li className="idea">
+    <li className="idea" data-id={idea.id}>
       {renaming ? (
         <input
           className="idea-label-input"
