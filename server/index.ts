@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import express, { type Request, type Response } from 'express';
 import { WebSocketServer, WebSocket } from 'ws';
 import {
+  MAX_IDEA_BYTES,
   ALLOWED_EXTENSIONS,
   AUDIO_EXTENSIONS,
   browseUrl,
@@ -23,6 +24,7 @@ import {
   type TransportState,
 } from '../shared/protocol.js';
 import { drumSong } from '../shared/drums.js';
+import { addIdea, ideaFile, patchIdea, removeIdea } from './ideas.js';
 import {
   checkPassword,
   createRoom,
@@ -385,6 +387,46 @@ app.delete('/api/rooms/:id/tabs/:tabId', (req, res) => {
   res.json({ ok: true });
 });
 
+// ---------- ideas (recorded takes) ----------
+
+const ideasChanged = (room: StoredRoom) => broadcast(room.id, { type: 'ideas', ideas: room.ideas ?? [] });
+
+// Upload a take: raw body (Content-Type = the recorder's mime), metadata in the query. Same id again = the same idea.
+app.post('/api/rooms/:id/ideas', express.raw({ type: () => true, limit: MAX_IDEA_BYTES }), (req, res) => {
+  const room = authed(req, res);
+  if (!room) return;
+  const r = addIdea(room, req.query as Record<string, unknown>, req.body as Buffer, req.header('content-type'));
+  if (typeof r === 'string') return void res.status(400).json({ error: r });
+  if (r.created) ideasChanged(room);
+  res.json(r.idea);
+});
+
+app.get('/api/rooms/:id/ideas/:ideaId', (req, res) => {
+  const room = authed(req, res);
+  if (!room) return;
+  const idea = room.ideas?.find((i) => i.id === req.params.ideaId);
+  if (!idea) return void res.status(404).json({ error: 'Idea not found' });
+  res.sendFile(ideaFile(room.id, idea), { headers: { 'Content-Type': idea.mime } });
+});
+
+app.patch('/api/rooms/:id/ideas/:ideaId', (req, res) => {
+  const room = authed(req, res);
+  if (!room) return;
+  const r = patchIdea(room, String(req.params.ideaId), { label: req.body?.label, tags: req.body?.tags });
+  if (r === null) return void res.status(404).json({ error: 'Idea not found' });
+  if (typeof r === 'string') return void res.status(400).json({ error: r });
+  ideasChanged(room);
+  res.json(r);
+});
+
+app.delete('/api/rooms/:id/ideas/:ideaId', (req, res) => {
+  const room = authed(req, res);
+  if (!room) return;
+  if (!removeIdea(room, String(req.params.ideaId))) return void res.status(404).json({ error: 'Idea not found' });
+  ideasChanged(room);
+  res.json({ ok: true });
+});
+
 // ---------- stems (StemDeck sidecar) ----------
 
 const tabsChanged = (room: StoredRoom) => broadcast(room.id, { type: 'tabs', tabs: room.tabs, currentTabId: room.currentTabId });
@@ -524,6 +566,7 @@ wss.on('connection', (ws, req) => {
           browse: lr.browse,
           drums: lr.drums,
           drumSongs: room.drumSongs ?? [],
+          ideas: room.ideas ?? [],
           chat: room.chat.slice(-100),
         },
         peers: [...lr.clients.values()].filter((c) => c.peer.clientId !== clientId).map((c) => c.peer),
